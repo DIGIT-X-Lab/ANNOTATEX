@@ -19,6 +19,12 @@ export const FloatingLabelMenu = ({
   const [adjustedPosition, setAdjustedPosition] = useState(position);
 
   useEffect(() => {
+    if (!position) {
+      setAdjustedPosition(null);
+    }
+  }, [position]);
+
+  useEffect(() => {
     if (!position || !menuRef.current) return;
 
     const menu = menuRef.current;
@@ -69,23 +75,24 @@ export const FloatingLabelMenu = ({
     };
   }, [onClose]);
 
-  if (!adjustedPosition) return null;
+  const coords = adjustedPosition ?? position;
+  if (!coords) return null;
 
   return (
     <div
       ref={menuRef}
       className="fixed z-50 glass-panel glass-gradient rounded-xl p-3 animate-in fade-in zoom-in duration-200"
       style={{
-        left: `${adjustedPosition.x}px`,
-        top: `${adjustedPosition.y}px`,
+        left: `${coords.x}px`,
+        top: `${coords.y}px`,
       }}
     >
-      <div className="flex items-center gap-2 mb-2 pb-2 border-b border-white/20">
+      <div className="flex items-center gap-2 mb-2 pb-2 border-b border-white/20 sticky top-0 bg-transparent backdrop-blur-sm">
         <Tag className="w-4 h-4 text-primary" />
         <span className="text-sm font-medium">Choose Label</span>
       </div>
 
-      <div className="flex flex-wrap gap-2 max-w-xs">
+      <div className="flex flex-wrap gap-2 max-w-xs max-h-48 overflow-y-auto pr-1">
         {labels.map((label) => (
           <button
             key={label.id}

@@ -1,7 +1,14 @@
+export interface LabelProperty {
+  id: string;
+  name: string;
+  type: "text";
+}
+
 export interface Label {
   id: string;
   name: string;
   color: string;
+  properties?: LabelProperty[];
 }
 
 export interface RelationType {
@@ -19,8 +26,10 @@ export interface Annotation {
   start: number;
   end: number;
   text: string;
+  labelId: string;
   label: string;
   color: string;
+  metadata?: AnnotationMetadata;
 }
 
 export interface Relationship {
@@ -29,3 +38,5 @@ export interface Relationship {
   target: string;
   type: string;
 }
+
+export type AnnotationMetadata = Record<string, string | number | null | undefined>;

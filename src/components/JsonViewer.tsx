@@ -15,7 +15,9 @@ export const JsonViewer = ({ text, annotations, relationships }: JsonViewerProps
       id: ann.id,
       span: [ann.start, ann.end],
       text: ann.text,
+      labelId: ann.labelId,
       label: ann.label,
+      metadata: ann.metadata,
     })),
     relationships: relationships.map((rel) => ({
       id: rel.id,
