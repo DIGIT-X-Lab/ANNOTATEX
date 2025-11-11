@@ -144,4 +144,48 @@ All colors MUST be HSL.
   .smooth-transition {
     transition: var(--transition-smooth);
   }
+
+  /* Glassmorphism effect */
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
+  }
+
+  .dark .glass-panel {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+  }
+
+  .glass-gradient {
+    background: linear-gradient(
+      135deg,
+      rgba(0, 184, 217, 0.1) 0%,
+      rgba(139, 92, 246, 0.1) 100%
+    );
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .label-button-glass {
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(8px);
+    transition: all 0.2s ease;
+  }
+
+  .label-button-glass:hover {
+    background: rgba(255, 255, 255, 0.25);
+    transform: translateY(-2px);
+  }
+
+  .dark .label-button-glass {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .dark .label-button-glass:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
 }

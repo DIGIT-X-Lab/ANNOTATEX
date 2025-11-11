@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Tag, Link as LinkIcon, Sparkles } from "lucide-react";
+import { Link as LinkIcon, Sparkles } from "lucide-react";
 import type { Annotation, Schema, Relationship } from "@/types/annotation";
 import { toast } from "sonner";
+import { FloatingLabelMenu } from "./FloatingLabelMenu";
 
 interface TextEditorProps {
   text: string;
@@ -28,31 +28,24 @@ export const TextEditor = ({
   relationships,
   onAddRelationship,
 }: TextEditorProps) => {
-  const [selection, setSelection] = useState<{ start: number; end: number } | null>(null);
-  const [showLabelMenu, setShowLabelMenu] = useState(false);
+  const [selection, setSelection] = useState<{ start: number; end: number; text: string } | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const [linkingMode, setLinkingMode] = useState(false);
   const [linkSource, setLinkSource] = useState<string | null>(null);
   const textRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "/" && !e.ctrlKey && !e.metaKey) {
-        const sel = window.getSelection();
-        if (sel && sel.toString().length > 0) {
-          e.preventDefault();
-          const text = sel.toString();
-          const range = sel.getRangeAt(0);
-          const start = getTextOffset(range.startContainer, range.startOffset);
-          const end = start + text.length;
-          setSelection({ start, end });
-          setShowLabelMenu(true);
-        }
-      }
-    };
+  const getSelectionCoordinates = () => {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return null;
 
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, []);
+    const range = sel.getRangeAt(0);
+    const rect = range.getBoundingClientRect();
+    
+    return {
+      x: rect.left + rect.width / 2 - 100, // Center the menu
+      y: rect.bottom + window.scrollY + 10, // Position below selection
+    };
+  };
 
   const getTextOffset = (node: Node, offset: number): number => {
     let textOffset = 0;
@@ -79,8 +72,12 @@ export const TextEditor = ({
       const range = sel.getRangeAt(0);
       const start = getTextOffset(range.startContainer, range.startOffset);
       const end = start + selectedText.length;
-      setSelection({ start, end });
-      setShowLabelMenu(true);
+      const coords = getSelectionCoordinates();
+      
+      if (coords) {
+        setSelection({ start, end, text: selectedText });
+        setMenuPosition(coords);
+      }
     }
   };
 
@@ -90,20 +87,25 @@ export const TextEditor = ({
     const label = schema.labels.find((l) => l.id === labelId);
     if (!label) return;
 
-    const selectedText = text.substring(selection.start, selection.end);
     const newAnnotation: Annotation = {
       id: `ann-${Date.now()}`,
       start: selection.start,
       end: selection.end,
-      text: selectedText,
+      text: selection.text,
       label: label.name,
       color: label.color,
     };
 
     onAddAnnotation(newAnnotation);
     setSelection(null);
-    setShowLabelMenu(false);
+    setMenuPosition(null);
     toast.success(`Added ${label.name} annotation`);
+  };
+
+  const handleCloseMenu = () => {
+    setSelection(null);
+    setMenuPosition(null);
+    window.getSelection()?.removeAllRanges();
   };
 
   const handleAnnotationClick = (annotation: Annotation, e: React.MouseEvent) => {
@@ -221,11 +223,17 @@ export const TextEditor = ({
       </div>
 
       <div className="text-sm text-muted-foreground mb-2 space-y-1">
-        <div>
-          <strong>Add:</strong> Select text → press <kbd className="px-2 py-1 bg-muted rounded text-xs">/</kbd> → choose label
+        <div className="flex items-center gap-2">
+          <span className="text-primary">✨</span>
+          <div>
+            <strong>Add:</strong> Simply select any text - a beautiful label menu appears!
+          </div>
         </div>
-        <div>
-          <strong>Remove:</strong> Hover over annotation → click the <span className="text-destructive font-bold">✕</span>
+        <div className="flex items-center gap-2">
+          <span className="text-destructive">✕</span>
+          <div>
+            <strong>Remove:</strong> Hover over annotation → click the <span className="text-destructive font-bold">✕</span>
+          </div>
         </div>
       </div>
 
@@ -237,30 +245,12 @@ export const TextEditor = ({
         {renderAnnotatedText()}
       </div>
 
-      <Popover open={showLabelMenu} onOpenChange={setShowLabelMenu}>
-        <PopoverTrigger asChild>
-          <div className="sr-only">Label Menu</div>
-        </PopoverTrigger>
-        <PopoverContent className="w-64 p-2">
-          <div className="space-y-1">
-            <div className="px-2 py-1.5 text-sm font-medium">Choose Label</div>
-            {schema.labels.map((label) => (
-              <Button
-                key={label.id}
-                variant="ghost"
-                className="w-full justify-start"
-                onClick={() => handleAddLabel(label.id)}
-              >
-                <div
-                  className="w-3 h-3 rounded-full mr-2"
-                  style={{ backgroundColor: label.color }}
-                />
-                {label.name}
-              </Button>
-            ))}
-          </div>
-        </PopoverContent>
-      </Popover>
+      <FloatingLabelMenu
+        labels={schema.labels}
+        position={menuPosition}
+        onSelectLabel={handleAddLabel}
+        onClose={handleCloseMenu}
+      />
     </div>
   );
 };
