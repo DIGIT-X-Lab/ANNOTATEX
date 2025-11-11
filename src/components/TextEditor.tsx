@@ -4,9 +4,10 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Link as LinkIcon, Sparkles } from "lucide-react";
-import type { Annotation, Schema, Relationship, AnnotationMetadata } from "@/types/annotation";
+import type { Annotation, Schema, Relationship, AnnotationMetadata, LabelProperty } from "@/types/annotation";
 import { toast } from "sonner";
 import { FloatingLabelMenu } from "./FloatingLabelMenu";
 import { cn } from "@/lib/utils";
@@ -49,6 +50,78 @@ export const TextEditor = ({
     ? schema.labels.find((label) => label.id === selectedAnnotation.labelId)
     : null;
   const labelProperties = selectedLabel?.properties ?? [];
+
+  const handleMetadataChange = (
+    annotationId: string,
+    propertyId: string,
+    value: string | number | boolean | null | undefined,
+  ) => {
+    onUpdateAnnotationMetadata(annotationId, {
+      [propertyId]: value,
+    });
+  };
+
+  const renderPropertyControl = (property: LabelProperty) => {
+    if (!selectedAnnotation) return null;
+    const currentValue = selectedAnnotation.metadata?.[property.id];
+
+    if (property.type === "select" && property.options && property.options.length > 0) {
+      return (
+        <Select
+          value={typeof currentValue === "string" ? currentValue : ""}
+          onValueChange={(value) => handleMetadataChange(selectedAnnotation.id, property.id, value)}
+        >
+          <SelectTrigger className="h-9">
+            <SelectValue placeholder="Choose option" />
+          </SelectTrigger>
+          <SelectContent>
+            {property.options.map((option) => (
+              <SelectItem key={option} value={option}>
+                {option}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      );
+    }
+
+    switch (property.type) {
+      case "number":
+        return (
+          <Input
+            type="number"
+            value={currentValue ?? ""}
+            onChange={(event) => {
+              const val = event.target.value;
+              handleMetadataChange(
+                selectedAnnotation.id,
+                property.id,
+                val === "" ? undefined : Number(val),
+              );
+            }}
+          />
+        );
+      case "boolean":
+        return (
+          <div className="flex items-center gap-2">
+            <Switch
+              checked={Boolean(currentValue)}
+              onCheckedChange={(checked) => handleMetadataChange(selectedAnnotation.id, property.id, checked)}
+            />
+            <span className="text-xs text-muted-foreground">{Boolean(currentValue) ? "Yes" : "No"}</span>
+          </div>
+        );
+      default:
+        return (
+          <Input
+            value={typeof currentValue === "string" ? currentValue : ""}
+            onChange={(event) =>
+              handleMetadataChange(selectedAnnotation.id, property.id, event.target.value)
+            }
+          />
+        );
+    }
+  };
 
   useEffect(() => {
     const handleSelection = () => {
@@ -182,7 +255,19 @@ export const TextEditor = ({
     const metadata: AnnotationMetadata | undefined =
       label.properties && label.properties.length
         ? label.properties.reduce<AnnotationMetadata>((acc, property) => {
-            acc[property.id] = "";
+            switch (property.type) {
+              case "boolean":
+                acc[property.id] = false;
+                break;
+              case "number":
+                acc[property.id] = null;
+                break;
+              case "select":
+                acc[property.id] = property.options?.[0] ?? "";
+                break;
+              default:
+                acc[property.id] = "";
+            }
             return acc;
           }, {})
         : undefined;
@@ -406,15 +491,7 @@ export const TextEditor = ({
             {labelProperties.map((property) => (
               <div key={property.id} className="space-y-1">
                 <Label className="text-xs uppercase text-muted-foreground">{property.name}</Label>
-                <Input
-                  value={String(selectedAnnotation.metadata?.[property.id] ?? "")}
-                  onChange={(event) =>
-                    onUpdateAnnotationMetadata(selectedAnnotation.id, {
-                      [property.id]: event.target.value,
-                    })
-                  }
-                  placeholder={`Set ${property.name.toLowerCase()}`}
-                />
+                {renderPropertyControl(property)}
               </div>
             ))}
           </div>

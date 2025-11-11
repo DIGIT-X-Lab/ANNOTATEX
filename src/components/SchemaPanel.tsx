@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Plus, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Schema, Label as SchemaLabel, RelationType } from "@/types/annotation";
 import { toast } from "sonner";
 import { SchemaImportDrawer } from "@/components/SchemaImportDrawer";
@@ -56,14 +57,16 @@ export const SchemaPanel = ({ schema, onUpdateSchema }: SchemaPanelProps) => {
   const derivedColor = useMemo(() => getNextColor(schema.labels), [schema.labels]);
   const [newLabelColor, setNewLabelColor] = useState(derivedColor);
   const [newRelationType, setNewRelationType] = useState("");
-  const [propertyInputs, setPropertyInputs] = useState<Record<
-    string,
-    {
-      name: string;
-      type: LabelProperty["type"];
-      options: string;
-    }
-  >>({});
+  const [propertyInputs, setPropertyInputs] = useState<
+    Record<
+      string,
+      {
+        name: string;
+        type: LabelProperty["type"];
+        options: string;
+      }
+    >
+  >({});
   const [importKey, setImportKey] = useState(0);
 
   useEffect(() => {
@@ -262,6 +265,9 @@ export const SchemaPanel = ({ schema, onUpdateSchema }: SchemaPanelProps) => {
                             className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-1 text-xs"
                           >
                             {property.name}
+                            <span className="text-[10px] uppercase text-muted-foreground">
+                              {property.type}
+                            </span>
                             <button
                               type="button"
                               className="text-muted-foreground hover:text-destructive"
@@ -278,24 +284,76 @@ export const SchemaPanel = ({ schema, onUpdateSchema }: SchemaPanelProps) => {
                     )}
                   </div>
 
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Add property (e.g. Location)"
-                      value={propertyInputs[label.id] ?? ""}
-                      onChange={(e) =>
-                        setPropertyInputs((prev) => ({ ...prev, [label.id]: e.target.value }))
-                      }
-                      className="h-8 text-sm"
-                    />
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleAddProperty(label.id)}
-                    >
-                      <Plus className="h-3 w-3 mr-1" />
-                      Add
-                    </Button>
-                  </div>
+                  {(() => {
+                    const draft =
+                      propertyInputs[label.id] ?? {
+                        name: "",
+                        type: "text" as LabelProperty["type"],
+                        options: "",
+                      };
+                    return (
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-2 gap-2">
+                          <Input
+                            placeholder="Property name"
+                            value={draft.name}
+                            onChange={(event) =>
+                              setPropertyInputs((prev) => ({
+                                ...prev,
+                                [label.id]: { ...draft, name: event.target.value },
+                              }))
+                            }
+                            className="h-8 text-sm"
+                          />
+                          <Select
+                            value={draft.type}
+                            onValueChange={(value) =>
+                              setPropertyInputs((prev) => ({
+                                ...prev,
+                                [label.id]: {
+                                  ...draft,
+                                  type: value as LabelProperty["type"],
+                                  options: value === "select" ? draft.options : "",
+                                },
+                              }))
+                            }
+                          >
+                            <SelectTrigger className="h-8 text-sm">
+                              <SelectValue placeholder="Type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="text">Text</SelectItem>
+                              <SelectItem value="number">Number</SelectItem>
+                              <SelectItem value="boolean">Boolean</SelectItem>
+                              <SelectItem value="select">Select</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {draft.type === "select" && (
+                          <Input
+                            placeholder="Comma-separated options (e.g. left,right)"
+                            value={draft.options}
+                            onChange={(event) =>
+                              setPropertyInputs((prev) => ({
+                                ...prev,
+                                [label.id]: { ...draft, options: event.target.value },
+                              }))
+                            }
+                            className="h-8 text-sm"
+                          />
+                        )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleAddProperty(label.id)}
+                          className="w-full"
+                        >
+                          <Plus className="h-3 w-3 mr-1" />
+                          Add property
+                        </Button>
+                      </div>
+                    );
+                  })()}
                 </div>
               ))}
             </div>

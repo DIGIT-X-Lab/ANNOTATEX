@@ -5,9 +5,11 @@ import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
-import type { Annotation, AnnotationMetadata, Relationship, Schema } from "@/types/annotation";
+import type { Annotation, AnnotationMetadata, Relationship, Schema, LabelProperty } from "@/types/annotation";
 import { Trash2, X } from "lucide-react";
 
 interface AnnotationWorkbenchProps {
@@ -40,6 +42,77 @@ export const AnnotationWorkbench = ({
     () => schema.labels.find((label) => label.id === selectedAnnotation?.labelId),
     [schema.labels, selectedAnnotation?.labelId],
   );
+  const labelProperties = selectedLabel?.properties ?? [];
+
+  const handleMetadataChange = (
+    annotationId: string,
+    propertyId: string,
+    value: string | number | boolean | null | undefined,
+  ) => {
+    onUpdateMetadata(annotationId, { [propertyId]: value });
+  };
+
+  const renderPropertyControl = (property: LabelProperty) => {
+    if (!selectedAnnotation) return null;
+    const currentValue = selectedAnnotation.metadata?.[property.id];
+
+    if (property.type === "select" && property.options && property.options.length > 0) {
+      return (
+        <Select
+          value={typeof currentValue === "string" ? currentValue : ""}
+          onValueChange={(value) => handleMetadataChange(selectedAnnotation.id, property.id, value)}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Choose option" />
+          </SelectTrigger>
+          <SelectContent>
+            {property.options.map((option) => (
+              <SelectItem key={option} value={option}>
+                {option}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      );
+    }
+
+    switch (property.type) {
+      case "number":
+        return (
+          <Input
+            type="number"
+            value={currentValue ?? ""}
+            onChange={(event) => {
+              const val = event.target.value;
+              handleMetadataChange(
+                selectedAnnotation.id,
+                property.id,
+                val === "" ? undefined : Number(val),
+              );
+            }}
+          />
+        );
+      case "boolean":
+        return (
+          <div className="flex items-center gap-2">
+            <Switch
+              checked={Boolean(currentValue)}
+              onCheckedChange={(checked) => handleMetadataChange(selectedAnnotation.id, property.id, checked)}
+            />
+            <span className="text-xs text-muted-foreground">{Boolean(currentValue) ? "Yes" : "No"}</span>
+          </div>
+        );
+      default:
+        return (
+          <Input
+            value={typeof currentValue === "string" ? currentValue : ""}
+            onChange={(event) =>
+              handleMetadataChange(selectedAnnotation.id, property.id, event.target.value)
+            }
+          />
+        );
+    }
+  };
 
   const relatedRelationships = useMemo(() => {
     if (!selectedAnnotation) return [];
@@ -147,19 +220,12 @@ export const AnnotationWorkbench = ({
                     <Label className="text-xs uppercase tracking-wide text-muted-foreground">
                       Properties
                     </Label>
-                    {selectedLabel?.properties && selectedLabel.properties.length > 0 ? (
+                    {labelProperties.length > 0 ? (
                       <div className="space-y-3">
-                        {selectedLabel.properties.map((property) => (
+                        {labelProperties.map((property) => (
                           <div key={property.id} className="space-y-1">
                             <p className="text-xs text-muted-foreground">{property.name}</p>
-                            <Input
-                              value={String(selectedAnnotation.metadata?.[property.id] ?? "")}
-                              onChange={(event) =>
-                                onUpdateMetadata(selectedAnnotation.id, {
-                                  [property.id]: event.target.value,
-                                })
-                              }
-                            />
+                            {renderPropertyControl(property)}
                           </div>
                         ))}
                       </div>
