@@ -74,7 +74,12 @@ const Index = () => {
         color: "#FC683F",
         properties: [
           { id: "location", name: "Location", type: "text" },
-          { id: "laterality", name: "Laterality", type: "text" },
+          {
+            id: "laterality",
+            name: "Laterality",
+            type: "select",
+            options: ["left", "right", "midline"],
+          },
           { id: "appearance", name: "Appearance", type: "text" },
         ],
       },
@@ -83,7 +88,12 @@ const Index = () => {
         name: "Finding",
         color: "#8B5CF6",
         properties: [
-          { id: "severity", name: "Severity", type: "text" },
+          {
+            id: "severity",
+            name: "Severity",
+            type: "select",
+            options: ["mild", "moderate", "severe"],
+          },
           { id: "impression", name: "Impression", type: "text" },
         ],
       },

@@ -1,7 +1,11 @@
+export type PropertyType = "text" | "number" | "boolean" | "select";
+
 export interface LabelProperty {
   id: string;
   name: string;
-  type: "text";
+  type: PropertyType;
+  options?: string[];
+  required?: boolean;
 }
 
 export interface Label {
@@ -39,4 +43,4 @@ export interface Relationship {
   type: string;
 }
 
-export type AnnotationMetadata = Record<string, string | number | null | undefined>;
+export type AnnotationMetadata = Record<string, string | number | boolean | null | undefined>;

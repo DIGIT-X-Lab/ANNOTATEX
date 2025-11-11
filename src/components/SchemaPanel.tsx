@@ -56,7 +56,14 @@ export const SchemaPanel = ({ schema, onUpdateSchema }: SchemaPanelProps) => {
   const derivedColor = useMemo(() => getNextColor(schema.labels), [schema.labels]);
   const [newLabelColor, setNewLabelColor] = useState(derivedColor);
   const [newRelationType, setNewRelationType] = useState("");
-  const [propertyInputs, setPropertyInputs] = useState<Record<string, string>>({});
+  const [propertyInputs, setPropertyInputs] = useState<Record<
+    string,
+    {
+      name: string;
+      type: LabelProperty["type"];
+      options: string;
+    }
+  >>({});
   const [importKey, setImportKey] = useState(0);
 
   useEffect(() => {
@@ -122,13 +129,13 @@ export const SchemaPanel = ({ schema, onUpdateSchema }: SchemaPanelProps) => {
   };
 
   const handleAddProperty = (labelId: string) => {
-    const inputValue = propertyInputs[labelId]?.trim();
-    if (!inputValue) {
+    const config = propertyInputs[labelId];
+    if (!config || !config.name.trim()) {
       toast.error("Property name is required");
       return;
     }
 
-    const normalizedId = inputValue.toLowerCase().replace(/\s+/g, "_");
+    const normalizedId = config.name.toLowerCase().replace(/\s+/g, "_");
     const targetLabel = schema.labels.find((label) => label.id === labelId);
     const alreadyExists = targetLabel?.properties?.some((prop) => prop.id === normalizedId);
     if (alreadyExists) {
@@ -144,8 +151,15 @@ export const SchemaPanel = ({ schema, onUpdateSchema }: SchemaPanelProps) => {
               ...(label.properties ?? []),
               {
                 id: normalizedId,
-                name: inputValue,
-                type: "text" as const,
+                name: config.name.trim(),
+                type: config.type,
+                options:
+                  config.type === "select"
+                    ? config.options
+                        .split(",")
+                        .map((option) => option.trim())
+                        .filter(Boolean)
+                    : undefined,
               },
             ],
           }
@@ -153,7 +167,10 @@ export const SchemaPanel = ({ schema, onUpdateSchema }: SchemaPanelProps) => {
     );
 
     onUpdateSchema({ ...schema, labels });
-    setPropertyInputs((prev) => ({ ...prev, [labelId]: "" }));
+    setPropertyInputs((prev) => ({
+      ...prev,
+      [labelId]: { name: "", type: "text", options: "" },
+    }));
     toast.success("Property added");
   };
 
