@@ -17,7 +17,7 @@ import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
 import pdfWorkerSrc from "pdfjs-dist/build/pdf.worker?url";
 
 const SAMPLE_TEXT =
-  "CHEST X-RAY (PA AND LATERAL)\n\nClinical History: 66-year-old with dyspnea; study extracted from MIMIC-CXR dataset.\n\nFindings:\n1. Patchy airspace opacities in the right mid and lower lung compatible with pneumonia.\n2. Mild cardiomegaly with prominent pulmonary vasculature.\n3. No pleural effusion or pneumothorax.\n\nImpression:\nRight lower-lobe consolidation consistent with infectious process. Recommend clinical correlation and short-term follow-up imaging.";
+  "CHEST X-RAY (PA AND LATERAL)\n\nClinical History: 66-year-old with dyspnea.\n\nFindings:\n1. Patchy airspace opacities in the right mid and lower lung compatible with pneumonia.\n2. Mild cardiomegaly with prominent pulmonary vasculature.\n3. No pleural effusion or pneumothorax.\n\nImpression:\nRight lower-lobe consolidation consistent with infectious process. Recommend clinical correlation and short-term follow-up imaging.";
 
 const generateId = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -69,45 +69,74 @@ const Index = () => {
   const [schema, setSchema] = useState<Schema>({
     labels: [
       {
-        id: "lesion",
-        name: "Lesion",
-        color: "#FC683F",
+        id: "cardiomegaly",
+        name: "Cardiomegaly",
+        color: "#00B8D9",
         properties: [
-          { id: "location", name: "Location", type: "text" },
-          {
-            id: "laterality",
-            name: "Laterality",
-            type: "select",
-            options: ["left", "right", "midline"],
-          },
-          { id: "appearance", name: "Appearance", type: "text" },
-        ],
-      },
-      {
-        id: "finding",
-        name: "Finding",
-        color: "#8B5CF6",
-        properties: [
+          { id: "presence", name: "Presence", type: "boolean" },
           {
             id: "severity",
             name: "Severity",
             type: "select",
-            options: ["mild", "moderate", "severe"],
+            options: ["Mild", "Medium", "Severe", "N/A"],
           },
-          { id: "impression", name: "Impression", type: "text" },
         ],
       },
       {
-        id: "anatomy",
-        name: "Anatomy",
-        color: "#10B981",
-        properties: [{ id: "structure", name: "Structure", type: "text" }],
+        id: "pleural_effusion",
+        name: "Pleural effusion",
+        color: "#8B5CF6",
+        properties: [
+          { id: "presence", name: "Presence", type: "boolean" },
+          {
+            id: "severity",
+            name: "Severity",
+            type: "select",
+            options: ["Mild", "Medium", "Severe", "N/A"],
+          },
+        ],
       },
       {
-        id: "clinical_history",
-        name: "Clinical History",
+        id: "pneumothorax",
+        name: "Pneumothorax",
+        color: "#10B981",
+        properties: [
+          { id: "presence", name: "Presence", type: "boolean" },
+          {
+            id: "severity",
+            name: "Severity",
+            type: "select",
+            options: ["Mild", "Medium", "Severe", "N/A"],
+          },
+        ],
+      },
+      {
+        id: "consolidation",
+        name: "Consolidation",
         color: "#F59E0B",
-        properties: [{ id: "symptom", name: "Symptom", type: "text" }],
+        properties: [
+          { id: "presence", name: "Presence", type: "boolean" },
+          {
+            id: "severity",
+            name: "Severity",
+            type: "select",
+            options: ["Mild", "Medium", "Severe", "N/A"],
+          },
+        ],
+      },
+      {
+        id: "pneumonia",
+        name: "Pneumonia",
+        color: "#F97316",
+        properties: [
+          { id: "presence", name: "Presence", type: "boolean" },
+          {
+            id: "severity",
+            name: "Severity",
+            type: "select",
+            options: ["Mild", "Medium", "Severe", "N/A"],
+          },
+        ],
       },
     ],
     relationTypes: [
