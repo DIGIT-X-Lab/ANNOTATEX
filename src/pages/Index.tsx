@@ -17,7 +17,7 @@ import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
 import pdfWorkerSrc from "pdfjs-dist/build/pdf.worker?url";
 
 const SAMPLE_TEXT =
-  "Elon Musk founded SpaceX in 2002. The company is headquartered in Hawthorne, California. SpaceX develops and manufactures spacecraft.";
+  "MRI BRAIN WITHOUT CONTRAST\n\nClinical History: 58-year-old with new onset headaches and visual aura.\n\nFindings:\n1. Focal T2/FLAIR hyperintensity involving the left occipital cortex with surrounding vasogenic edema.\n2. No acute hemorrhage or restricted diffusion.\n3. Ventricular size and midline structures are normal.\n\nImpression:\nLesion in the left occipital lobe consistent with low-grade neoplasm. Recommend correlation with ophthalmologic exam and follow-up imaging.";
 
 const generateId = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -69,41 +69,41 @@ const Index = () => {
   const [schema, setSchema] = useState<Schema>({
     labels: [
       {
-        id: "person",
-        name: "Person",
-        color: "#00B8D9",
-        properties: [
-          { id: "role", name: "Role", type: "text" },
-          { id: "sentiment", name: "Sentiment", type: "text" },
-          { id: "notes", name: "Notes", type: "text" },
-        ],
-      },
-      {
-        id: "organization",
-        name: "Organization",
-        color: "#8B5CF6",
+        id: "lesion",
+        name: "Lesion",
+        color: "#FC683F",
         properties: [
           { id: "location", name: "Location", type: "text" },
-          { id: "notes", name: "Notes", type: "text" },
+          { id: "laterality", name: "Laterality", type: "text" },
+          { id: "appearance", name: "Appearance", type: "text" },
         ],
       },
       {
-        id: "location",
-        name: "Location",
-        color: "#10B981",
-        properties: [{ id: "type", name: "Type", type: "text" }],
+        id: "finding",
+        name: "Finding",
+        color: "#8B5CF6",
+        properties: [
+          { id: "severity", name: "Severity", type: "text" },
+          { id: "impression", name: "Impression", type: "text" },
+        ],
       },
       {
-        id: "date",
-        name: "Date",
+        id: "anatomy",
+        name: "Anatomy",
+        color: "#10B981",
+        properties: [{ id: "structure", name: "Structure", type: "text" }],
+      },
+      {
+        id: "clinical_history",
+        name: "Clinical History",
         color: "#F59E0B",
-        properties: [{ id: "context", name: "Context", type: "text" }],
+        properties: [{ id: "symptom", name: "Symptom", type: "text" }],
       },
     ],
     relationTypes: [
-      { id: "founded", name: "Founded / Created" },
+      { id: "associated_with", name: "Associated With" },
       { id: "located_in", name: "Located In" },
-      { id: "works_for", name: "Works For" },
+      { id: "progression_of", name: "Progression Of" },
     ],
   });
   const [isImporting, setIsImporting] = useState(false);

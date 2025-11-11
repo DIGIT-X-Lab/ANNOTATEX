@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   Drawer,
   DrawerClose,
@@ -39,6 +39,7 @@ export const SchemaImportDrawer = ({ onApply }: SchemaImportDrawerProps) => {
   const [parsedSchema, setParsedSchema] = useState<Schema | null>(DEFAULT_SCHEMA);
   const [error, setError] = useState<string | null>(null);
   const [isLoadingTemplate, setIsLoadingTemplate] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const previewStats = useMemo(() => {
     if (!parsedSchema) return null;
@@ -100,6 +101,25 @@ export const SchemaImportDrawer = ({ onApply }: SchemaImportDrawerProps) => {
     toast.success(`Schema imported (${parsedSchema.labels.length} labels)`);
   };
 
+  const handleUploadButton = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      setRawInput(text);
+      parseInput(text);
+      toast.success(`Loaded schema from ${file.name}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to read file");
+    } finally {
+      event.target.value = "";
+    }
+  };
+
   return (
     <Drawer open={open} onOpenChange={setOpen}>
       <DrawerTrigger asChild>
@@ -126,6 +146,19 @@ export const SchemaImportDrawer = ({ onApply }: SchemaImportDrawerProps) => {
                 onChange={(event) => handleTextareaChange(event.target.value)}
                 className="font-mono text-xs min-h-[200px]"
               />
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>Paste JSON or upload from file.</span>
+                <Button variant="outline" size="sm" onClick={handleUploadButton}>
+                  Upload file
+                </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="application/json"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+              </div>
               {error && <p className="text-xs text-destructive">{error}</p>}
             </TabsContent>
             <TabsContent value="templates" className="mt-4">
