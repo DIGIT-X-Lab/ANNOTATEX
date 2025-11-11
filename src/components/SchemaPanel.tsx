@@ -205,7 +205,7 @@ export const SchemaPanel = ({ schema, onUpdateSchema }: SchemaPanelProps) => {
           <h2 className="text-lg font-semibold">Schema</h2>
           <p className="text-sm text-muted-foreground mt-1">Define your annotation ontology</p>
         </div>
-        <SchemaImportDrawer key={importKey} onApply={handleImportSchema} />
+        <SchemaImportDrawer key={importKey} currentSchema={schema} onApply={handleImportSchema} />
       </div>
 
       <ScrollArea className="flex-1 p-4">

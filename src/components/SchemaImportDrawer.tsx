@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Drawer,
   DrawerClose,
@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import type { Schema } from "@/types/annotation";
 
 interface SchemaImportDrawerProps {
+  currentSchema: Schema;
   onApply: (schema: Schema, mode: "replace" | "merge") => void;
 }
 
@@ -30,13 +31,11 @@ const TEMPLATES = [
   },
 ];
 
-const DEFAULT_SCHEMA: Schema = { labels: [], relationTypes: [] };
-
-export const SchemaImportDrawer = ({ onApply }: SchemaImportDrawerProps) => {
+export const SchemaImportDrawer = ({ currentSchema, onApply }: SchemaImportDrawerProps) => {
   const [open, setOpen] = useState(false);
-  const [rawInput, setRawInput] = useState("\n{\n  \"labels\": [],\n  \"relationTypes\": []\n}\n");
+  const [rawInput, setRawInput] = useState(() => JSON.stringify(currentSchema, null, 2));
   const [mode, setMode] = useState<"replace" | "merge">("replace");
-  const [parsedSchema, setParsedSchema] = useState<Schema | null>(DEFAULT_SCHEMA);
+  const [parsedSchema, setParsedSchema] = useState<Schema | null>(currentSchema);
   const [error, setError] = useState<string | null>(null);
   const [isLoadingTemplate, setIsLoadingTemplate] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -72,6 +71,16 @@ export const SchemaImportDrawer = ({ onApply }: SchemaImportDrawerProps) => {
     setRawInput(value);
     parseInput(value);
   };
+
+  useEffect(() => {
+    if (open) {
+      const fresh = JSON.stringify(currentSchema, null, 2);
+      setRawInput(fresh);
+      parseInput(fresh);
+      setMode("replace");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, currentSchema]);
 
   const handleTemplateLoad = async (templateUrl: string) => {
     try {
