@@ -52,6 +52,7 @@ npm run preview   # optional: serves the dist bundle at http://localhost:4173
 
 - AnnotateX ships with the DIGITX / LMU Radiology theme (Quipu Orange `#FC683F`). Adjust the CSS custom properties in `src/index.css` to retheme.
 - Drop a hero image at `public/brand-banner.jpg` (PNG/JPG/WebP) to replace the default gradient banner that sits under the header.
+- Swap `public/favicon.svg` with your lab's mark (SVG is recommended) to update the browser tab icon.
 
 ### Docker / Compose
 

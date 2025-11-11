@@ -81,7 +81,7 @@ export const FloatingLabelMenu = ({
   return (
     <div
       ref={menuRef}
-      className="fixed z-50 glass-panel glass-gradient rounded-xl p-3 animate-in fade-in zoom-in duration-200"
+      className="fixed z-50 glass-panel glass-gradient rounded-xl p-3 animate-in fade-in zoom-in duration-200 max-w-[360px]"
       style={{
         left: `${coords.x}px`,
         top: `${coords.y}px`,
@@ -92,7 +92,7 @@ export const FloatingLabelMenu = ({
         <span className="text-sm font-medium">Choose Label</span>
       </div>
 
-      <div className="flex flex-wrap gap-2 max-w-xs max-h-48 overflow-y-auto pr-1">
+      <div className="flex flex-wrap gap-2 max-w-[320px] max-h-60 overflow-y-auto pr-1">
         {labels.map((label) => (
           <button
             key={label.id}

@@ -215,6 +215,7 @@ Each feature will keep the “glassmorphic” aesthetic and avoid clutter—pref
 - Brand palette lives in `src/index.css`. Change the CSS custom properties (`--primary`, `--accent`, etc.) to match your institution’s style guide.
 - The header/badge copy is controlled inside `src/components/Header.tsx`.
 - Drop a hero image at `public/brand-banner.jpg` (PNG/JPG/WebP) to override the default gradient banner rendered by `BrandBanner`.
+- Replace `public/favicon.svg` with an SVG of your lab logo to customize the browser tab icon.
 
 ---
 
