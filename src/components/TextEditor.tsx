@@ -34,6 +34,45 @@ export const TextEditor = ({
   const [linkSource, setLinkSource] = useState<string | null>(null);
   const textRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    const handleSelection = () => {
+      const sel = window.getSelection();
+      console.log("Selection changed:", sel?.toString());
+      
+      if (!sel || sel.toString().trim().length === 0) {
+        setMenuPosition(null);
+        return;
+      }
+
+      const selectedText = sel.toString();
+      const range = sel.getRangeAt(0);
+      
+      // Check if selection is within our text editor
+      if (!textRef.current?.contains(range.commonAncestorContainer)) {
+        return;
+      }
+      
+      // Get text offsets for annotation
+      const start = getTextOffset(range.startContainer, range.startOffset);
+      const end = start + selectedText.length;
+      
+      // Get screen coordinates for menu positioning
+      const rect = range.getBoundingClientRect();
+      const coords = {
+        x: rect.left + rect.width / 2 - 100,
+        y: rect.bottom + window.scrollY + 10,
+      };
+      
+      console.log("Setting selection:", { selectedText, start, end, coords });
+      
+      setSelection({ start, end, text: selectedText });
+      setMenuPosition(coords);
+    };
+
+    document.addEventListener("selectionchange", handleSelection);
+    return () => document.removeEventListener("selectionchange", handleSelection);
+  }, []);
+
   const getTextOffset = (node: Node, offset: number): number => {
     if (!textRef.current) return 0;
     
@@ -54,44 +93,6 @@ export const TextEditor = ({
     return textOffset;
   };
 
-  const getSelectionCoordinates = () => {
-    const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) return null;
-
-    const range = sel.getRangeAt(0);
-    const rect = range.getBoundingClientRect();
-    
-    return {
-      x: rect.left + rect.width / 2 - 100, // Center the menu
-      y: rect.bottom + window.scrollY + 10, // Position below selection
-    };
-  };
-
-  const handleTextSelect = () => {
-    const sel = window.getSelection();
-    if (!sel || sel.toString().trim().length === 0) {
-      return;
-    }
-
-    const selectedText = sel.toString();
-    const range = sel.getRangeAt(0);
-    
-    // Get text offsets for annotation
-    const start = getTextOffset(range.startContainer, range.startOffset);
-    const end = start + selectedText.length;
-    
-    // Get screen coordinates for menu positioning
-    const coords = getSelectionCoordinates();
-    
-    console.log("Text selected:", { selectedText, start, end, coords });
-    
-    if (coords) {
-      setSelection({ start, end, text: selectedText });
-      setMenuPosition(coords);
-    } else {
-      console.warn("Could not get selection coordinates");
-    }
-  };
 
   const handleAddLabel = (labelId: string) => {
     if (!selection) return;
@@ -251,9 +252,8 @@ export const TextEditor = ({
 
       <div
         ref={textRef}
-        className="min-h-[400px] p-6 bg-card border border-border rounded-lg leading-relaxed text-base select-text"
-        onMouseUp={handleTextSelect}
-        style={{ userSelect: "text", WebkitUserSelect: "text" }}
+        className="min-h-[400px] p-6 bg-card border border-border rounded-lg leading-relaxed text-base cursor-text"
+        style={{ userSelect: "text", WebkitUserSelect: "text", MozUserSelect: "text" }}
       >
         {renderAnnotatedText()}
       </div>
