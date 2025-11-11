@@ -27,24 +27,36 @@ export const FloatingLabelMenu = ({ labels, position, onSelectLabel, onClose }: 
     const rect = menu.getBoundingClientRect();
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
+    const scrollX = window.scrollX;
+    const scrollY = window.scrollY;
 
     let { x, y } = position;
+    let viewportX = position.x - scrollX;
+    let viewportY = position.y - scrollY;
 
-    if (x + rect.width > viewportWidth - 20) {
-      x = viewportWidth - rect.width - 20;
+    if (viewportX + rect.width > viewportWidth - 20) {
+      x = scrollX + viewportWidth - rect.width - 20;
+      viewportX = x - scrollX;
     }
-    if (x < 20) {
-      x = 20;
+    if (viewportX < 20) {
+      x = scrollX + 20;
+      viewportX = x - scrollX;
     }
 
-    if (y + rect.height > viewportHeight - 20) {
-      y = position.y - rect.height - 10;
-      if (y < 20) {
-        y = viewportHeight - rect.height - 20;
-      }
-    }
-    if (y < 20) {
-      y = 20;
+    const padding = 12;
+    const fitsBelow = viewportY + rect.height + padding <= viewportHeight - 20;
+    const fitsAbove = viewportY - rect.height - padding >= 20;
+
+    if (fitsBelow) {
+      y = position.y + padding;
+    } else if (fitsAbove) {
+      y = position.y - rect.height - padding;
+    } else {
+      const clampedViewportY = Math.min(
+        Math.max(viewportY, 20),
+        viewportHeight - rect.height - 20,
+      );
+      y = scrollY + clampedViewportY;
     }
 
     setAdjustedPosition({ x, y });
