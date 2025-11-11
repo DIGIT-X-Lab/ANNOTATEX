@@ -109,4 +109,4 @@ A sample chest X-ray report is preloaded so you can see how AnnotateX validates 
 
 ## License
 
-MIT
+Apache-2.0
