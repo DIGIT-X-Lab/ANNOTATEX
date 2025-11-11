@@ -34,23 +34,12 @@ export const TextEditor = ({
   const [linkSource, setLinkSource] = useState<string | null>(null);
   const textRef = useRef<HTMLDivElement>(null);
 
-  const getSelectionCoordinates = () => {
-    const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) return null;
-
-    const range = sel.getRangeAt(0);
-    const rect = range.getBoundingClientRect();
-    
-    return {
-      x: rect.left + rect.width / 2 - 100, // Center the menu
-      y: rect.bottom + window.scrollY + 10, // Position below selection
-    };
-  };
-
   const getTextOffset = (node: Node, offset: number): number => {
+    if (!textRef.current) return 0;
+    
     let textOffset = 0;
     const walker = document.createTreeWalker(
-      textRef.current!,
+      textRef.current,
       NodeFilter.SHOW_TEXT,
       null
     );
@@ -65,19 +54,42 @@ export const TextEditor = ({
     return textOffset;
   };
 
+  const getSelectionCoordinates = () => {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return null;
+
+    const range = sel.getRangeAt(0);
+    const rect = range.getBoundingClientRect();
+    
+    return {
+      x: rect.left + rect.width / 2 - 100, // Center the menu
+      y: rect.bottom + window.scrollY + 10, // Position below selection
+    };
+  };
+
   const handleTextSelect = () => {
     const sel = window.getSelection();
-    if (sel && sel.toString().length > 0) {
-      const selectedText = sel.toString();
-      const range = sel.getRangeAt(0);
-      const start = getTextOffset(range.startContainer, range.startOffset);
-      const end = start + selectedText.length;
-      const coords = getSelectionCoordinates();
-      
-      if (coords) {
-        setSelection({ start, end, text: selectedText });
-        setMenuPosition(coords);
-      }
+    if (!sel || sel.toString().trim().length === 0) {
+      return;
+    }
+
+    const selectedText = sel.toString();
+    const range = sel.getRangeAt(0);
+    
+    // Get text offsets for annotation
+    const start = getTextOffset(range.startContainer, range.startOffset);
+    const end = start + selectedText.length;
+    
+    // Get screen coordinates for menu positioning
+    const coords = getSelectionCoordinates();
+    
+    console.log("Text selected:", { selectedText, start, end, coords });
+    
+    if (coords) {
+      setSelection({ start, end, text: selectedText });
+      setMenuPosition(coords);
+    } else {
+      console.warn("Could not get selection coordinates");
     }
   };
 
@@ -239,8 +251,9 @@ export const TextEditor = ({
 
       <div
         ref={textRef}
-        className="min-h-[400px] p-6 bg-card border border-border rounded-lg leading-relaxed text-base"
+        className="min-h-[400px] p-6 bg-card border border-border rounded-lg leading-relaxed text-base select-text"
         onMouseUp={handleTextSelect}
+        style={{ userSelect: "text", WebkitUserSelect: "text" }}
       >
         {renderAnnotatedText()}
       </div>
