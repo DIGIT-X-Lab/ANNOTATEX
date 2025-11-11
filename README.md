@@ -53,8 +53,6 @@ npm install
 npm run dev
 ```
 
-Visit `http://localhost:5173` to use AnnotateX with hot reloading.
-
 ### Production Build
 
 ```bash
