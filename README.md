@@ -1,8 +1,61 @@
-# Welcome to your Lovable project
+# AnnotateX
 
-## Project info
+> Transform text into structure
 
-**URL**: https://lovable.dev/projects/640e5da5-ff22-496f-b6ca-451f71c1cd5e
+A sleek, minimalistic, and powerful text annotation platform by **Digit-X Labs**, creators of MosaicX.
+
+![AnnotateX](https://img.shields.io/badge/version-1.0.0-00B8D9)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Docker](https://img.shields.io/badge/docker-ready-blue)
+
+## Features
+
+✨ **Highlight & Label** - Select text spans and assign entity labels with keyboard shortcuts  
+🔗 **Relationship Mapping** - Drag connections between annotated entities  
+📊 **Live JSON Output** - Real-time structured data preview  
+🎨 **Custom Schemas** - Define your own ontologies and label systems  
+⚡ **Keyboard-First** - Fast annotation with `/label` and `/relate` shortcuts  
+📦 **Export Ready** - Download as JSON or CSV  
+🌓 **Dark Mode** - Beautiful in light or dark theme  
+🤖 **AI Assist** - Smart label suggestions (coming soon)
+
+## Quick Start
+
+### With Docker (Recommended)
+
+```bash
+docker-compose up -d
+```
+
+Access at `http://localhost:8080`
+
+### Manual Setup
+
+```bash
+npm install
+npm run dev
+```
+
+## On-Premises Deployment
+
+AnnotateX is designed for self-hosting. See **[DEPLOYMENT.md](./DEPLOYMENT.md)** for complete deployment guide including:
+
+- Docker deployment
+- Nginx/Apache configuration  
+- SSL/TLS setup
+- Production hardening
+- Monitoring & troubleshooting
+
+### Quick Deploy Script
+
+```bash
+chmod +x deploy.sh
+./deploy.sh prod
+```
+
+## Project Info
+
+**Lovable Project URL**: https://lovable.dev/projects/640e5da5-ff22-496f-b6ca-451f71c1cd5e
 
 ## How can I edit this code?
 
