@@ -1,19 +1,25 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./github-banner-dark.png" />
+  <img alt="AnnotateX" src="./github-banner-light.png" />
+</picture>
+
 # AnnotateX
 
 Declarative dataset annotation workspace built with React, Vite, shadcn/ui, and Tailwind.
 
-## Install
+## Quick Start
 
-```
+```bash
 npm install
-npm run build
+npm run dev
 ```
 
-## Scripts
+## Build
 
-- `npm run dev`
-- `npm run build`
-- `npm run preview`
+```bash
+npm run build
+npm run preview
+```
 
 ## License
 
