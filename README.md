@@ -1,6 +1,6 @@
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="./github-banner-dark.png" />
-  <img alt="AnnotateX" src="./github-banner-light.png" />
+  <source media="(prefers-color-scheme: dark)" srcset="./public/assets/Annotatex-dark-mode.png" />
+  <img alt="AnnotateX" src="./public/assets/Annotatex-light-mode.png" />
 </picture>
 
 # AnnotateX
