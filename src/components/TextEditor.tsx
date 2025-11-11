@@ -151,7 +151,7 @@ export const TextEditor = ({
       const rect = range.getBoundingClientRect();
       const coords = {
         x: rect.left + rect.width / 2 - 100,
-        y: rect.bottom + window.scrollY + 10,
+        y: rect.bottom + 10,
       };
 
       setSelection({ start: offsets.start, end: offsets.end, text: selectedText });
