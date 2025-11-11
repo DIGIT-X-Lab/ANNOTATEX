@@ -106,7 +106,9 @@ export const TextEditor = ({
     toast.success(`Added ${label.name} annotation`);
   };
 
-  const handleAnnotationClick = (annotation: Annotation) => {
+  const handleAnnotationClick = (annotation: Annotation, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
     if (linkingMode && linkSource) {
       // Create relationship
       const newRelationship: Relationship = {
@@ -122,6 +124,16 @@ export const TextEditor = ({
     } else if (linkingMode) {
       setLinkSource(annotation.id);
       toast.info("Select target annotation");
+    }
+  };
+
+  const handleAnnotationRightClick = (annotation: Annotation, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (window.confirm(`Remove "${annotation.text}" (${annotation.label}) annotation?`)) {
+      onRemoveAnnotation(annotation.id);
+      toast.success("Annotation removed");
     }
   };
 
@@ -147,17 +159,22 @@ export const TextEditor = ({
         <Badge
           key={annotation.id}
           variant="secondary"
-          className="annotation-highlight cursor-pointer mx-0.5"
+          className="annotation-highlight cursor-pointer mx-0.5 group relative"
           style={{
             backgroundColor: annotation.color + "20",
             borderColor: annotation.color,
             borderWidth: "1px",
             color: "inherit",
           }}
-          onClick={() => handleAnnotationClick(annotation)}
+          onClick={(e) => handleAnnotationClick(annotation, e)}
+          onContextMenu={(e) => handleAnnotationRightClick(annotation, e)}
+          title="Right-click to remove"
         >
           {annotation.text}
           <span className="ml-1 text-xs opacity-70">{annotation.label}</span>
+          <span className="ml-1 text-xs opacity-0 group-hover:opacity-100 transition-opacity">
+            ✕
+          </span>
         </Badge>
       );
 
@@ -202,9 +219,16 @@ export const TextEditor = ({
         </div>
       </div>
 
-      <div className="text-sm text-muted-foreground mb-2">
-        Select text and press <kbd className="px-2 py-1 bg-muted rounded">/</kbd> or use the label
-        menu
+      <div className="text-sm text-muted-foreground mb-2 space-y-1">
+        <div>
+          <strong>Add annotation:</strong> Select text → press <kbd className="px-2 py-1 bg-muted rounded text-xs">/</kbd> → choose label
+        </div>
+        <div>
+          <strong>Remove annotation:</strong> Right-click on any highlighted annotation
+        </div>
+        <div className="text-xs opacity-75">
+          💡 Hover over annotations to see the ✕ delete indicator
+        </div>
       </div>
 
       <div
