@@ -47,7 +47,7 @@ AnnotateX is a fully on-prem annotation workspace that combines a precision text
 ### Local Development
 
 ```bash
-git clone <repo>
+git clone https://github.com/LalithShiyam/annotatex.git
 cd annotatex
 npm install
 npm run dev
