@@ -7,6 +7,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import type { Schema, Label as SchemaLabel, RelationType } from "@/types/annotation";
 import { toast } from "sonner";
+import { SchemaImportDrawer } from "@/components/SchemaImportDrawer";
 
 const COLOR_PALETTE = [
   "#00B8D9",
@@ -56,10 +57,37 @@ export const SchemaPanel = ({ schema, onUpdateSchema }: SchemaPanelProps) => {
   const [newLabelColor, setNewLabelColor] = useState(derivedColor);
   const [newRelationType, setNewRelationType] = useState("");
   const [propertyInputs, setPropertyInputs] = useState<Record<string, string>>({});
+  const [importKey, setImportKey] = useState(0);
 
   useEffect(() => {
     setNewLabelColor(derivedColor);
   }, [derivedColor]);
+
+  const handleImportSchema = (incoming: Schema, importMode: "replace" | "merge") => {
+    if (importMode === "replace") {
+      onUpdateSchema({
+        labels: incoming.labels ?? [],
+        relationTypes: incoming.relationTypes ?? [],
+      });
+      setImportKey((prev) => prev + 1);
+      toast.success("Schema replaced");
+      return;
+    }
+
+    const labelMap = new Map<string, SchemaLabel>();
+    schema.labels.forEach((label) => labelMap.set(label.id, label));
+    incoming.labels?.forEach((label) => labelMap.set(label.id, label));
+
+    const relationMap = new Map<string, RelationType>();
+    schema.relationTypes.forEach((relation) => relationMap.set(relation.id, relation));
+    incoming.relationTypes?.forEach((relation) => relationMap.set(relation.id, relation));
+
+    onUpdateSchema({
+      labels: Array.from(labelMap.values()),
+      relationTypes: Array.from(relationMap.values()),
+    });
+    toast.success("Schema merged");
+  };
 
   const handleAddLabel = () => {
     if (!newLabelName.trim()) {
@@ -172,9 +200,12 @@ export const SchemaPanel = ({ schema, onUpdateSchema }: SchemaPanelProps) => {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="p-4 border-b border-border">
-        <h2 className="text-lg font-semibold">Schema</h2>
-        <p className="text-sm text-muted-foreground mt-1">Define your annotation ontology</p>
+      <div className="p-4 border-b border-border flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">Schema</h2>
+          <p className="text-sm text-muted-foreground mt-1">Define your annotation ontology</p>
+        </div>
+        <SchemaImportDrawer key={importKey} onApply={handleImportSchema} />
       </div>
 
       <ScrollArea className="flex-1 p-4">

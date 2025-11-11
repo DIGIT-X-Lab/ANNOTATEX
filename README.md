@@ -74,7 +74,7 @@ The default Nginx config (see `nginx.conf`) serves the optimized build at `http:
 | **Document Toolbar** | Load folders, jump between docs, see format badges + progress bar | Use `⌥ + ←/→` to move between documents without leaving the keyboard |
 | **Editor** | Select spans to label, toggle link mode, inline sentiment picker | Click an annotation to focus; `Link Annotations` button toggles relationship mode |
 | **JSON Viewer** | Read-only, auto-updating JSON representing text, annotations, metadata, relationships | Copy/paste for downstream tooling |
-| **Schema Tab** | Manage labels, colors, and custom properties | Add/remove any number of per-label properties (location, severity, etc.) |
+| **Schema Tab** | Manage labels, colors, and custom properties | Import JSON schema templates or add/remove properties manually |
 | **Workbench Tab** | Inspect selected annotation, edit custom properties, remove annotations/relations | Hover relationships list to delete edges |
 | **Graph Tab** | Drag nodes, draw relationships, confirm direction/type, delete edges | Select edge + `Delete` key to remove |
 | **Export Button** | Bottom-left floating action button | Export the active doc or the entire dataset (JSON/CSV) |

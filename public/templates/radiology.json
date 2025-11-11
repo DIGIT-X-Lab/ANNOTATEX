@@ -1,0 +1,34 @@
+{
+  "labels": [
+    {
+      "id": "lesion",
+      "name": "Lesion",
+      "color": "#FC683F",
+      "properties": [
+        { "id": "location", "name": "Location", "type": "text" },
+        { "id": "laterality", "name": "Laterality", "type": "text" }
+      ]
+    },
+    {
+      "id": "finding",
+      "name": "Finding",
+      "color": "#8B5CF6",
+      "properties": [
+        { "id": "severity", "name": "Severity", "type": "text" },
+        { "id": "impression", "name": "Impression", "type": "text" }
+      ]
+    },
+    {
+      "id": "anatomy",
+      "name": "Anatomy",
+      "color": "#10B981",
+      "properties": [
+        { "id": "structure", "name": "Structure", "type": "text" }
+      ]
+    }
+  ],
+  "relationTypes": [
+    { "id": "associated_with", "name": "Associated With" },
+    { "id": "located_in", "name": "Located In" }
+  ]
+}
