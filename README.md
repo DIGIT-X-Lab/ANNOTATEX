@@ -81,6 +81,36 @@ The default Nginx config (see `nginx.conf`) serves the optimized build at `http:
 
 ---
 
+## Radiology Validation Example
+
+AnnotateX ships with a sample MRI brain report and a radiology schema so you can see how the tool validates structured AI output:
+
+1. **Incoming AI JSON**
+
+   ```json
+   {
+     "lesion": {
+       "location": "left occipital cortex",
+       "laterality": "left",
+       "appearance": "T2/FLAIR hyperintensity"
+     },
+     "finding": {
+       "severity": "moderate",
+       "impression": "Low-grade neoplasm"
+     }
+   }
+   ```
+
+2. **Validate in AnnotateX**
+
+   - Load the default report and highlight the relevant clauses (“Focal T2/FLAIR hyperintensity… left occipital cortex…”).
+   - Set the metadata in the inline property cards (location, laterality, severity, impression).
+   - Live JSON panel mirrors your updates so you can compare with the AI’s suggestion or export the corrected structure.
+
+This same workflow applies to any clinical note or radiology exam—just import your schema (lesions, findings, anatomy, etc.) and confirm each structured field before it reaches downstream systems.
+
+---
+
 ## Architecture Overview
 
 - **Frontend stack**: Vite + React 18 + TypeScript, shadcn/ui + Tailwind for components, React Flow for graph interactions.

@@ -220,4 +220,17 @@ Each feature will keep the “glassmorphic” aesthetic and avoid clutter—pref
 
 ---
 
+## 11. Sample Validation Flow
+
+AnnotateX's default dataset demonstrates how radiology teams validate structured outputs:
+
+1. **Sample Report** – MRI brain report describing a left occipital lesion.
+2. **Schema** – Lesion, Finding, Anatomy, Clinical History labels, each with configurable properties (location, laterality, severity, etc.).
+3. **AI JSON** – External model proposes structured fields (e.g., lesion location, severity). Annotators confirm or adjust by highlighting the source text and editing properties inline.
+4. **Export** – Final JSON reflects verified metadata ready for PACS, registries, or analytics. The CSV export includes every property column for auditing.
+
+Use the schema import drawer to load your own ontology or start from the provided templates, then follow the same flow for validating oncology, cardiology, or pathology reports.
+
+---
+
 For questions or custom integrations, reach out to the AnnotateX maintainers. This document should evolve alongside the codebase; update it whenever architecture or workflows change.
