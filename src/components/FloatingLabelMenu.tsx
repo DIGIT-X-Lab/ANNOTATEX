@@ -39,6 +39,9 @@ export const FloatingLabelMenu = ({ labels, position, onSelectLabel, onClose }: 
 
     if (y + rect.height > viewportHeight - 20) {
       y = position.y - rect.height - 10;
+      if (y < 20) {
+        y = viewportHeight - rect.height - 20;
+      }
     }
     if (y < 20) {
       y = 20;
