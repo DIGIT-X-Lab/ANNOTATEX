@@ -20,11 +20,32 @@
   <img src="https://img.shields.io/badge/React%20Flow-cff8e6?style=flat-square&logo=react&logoColor=0A0A0A" alt="React Flow" />
 </p>
 
-AnnotateX is a fully on-prem annotation workspace that combines a precision text editor, schema workbench, and interactive knowledge graph. Everything you tag stays in sync across the editor, JSON inspector, exports, and graph view—ready for downstream NLP, analytics, or LLM tuning.
+A free, on-prem text annotation workspace designed for creating gold-standard structured datasets.
 
----
+AnnotateX helps you highlight text, label important information, and define how pieces of text relate to each other. As you tag and structure your text, AnnotateX automatically creates a consistent knowledge graph and structured data output (JSON), keeping everything synchronized and ready for NLP, analytics, or training large language models.
 
-## Product Highlights
+Use AnnotateX to easily build clear, structured datasets that become the trusted reference (“gold standard”) for AI systems to learn from.
+
+
+## ⚙️ What AnnotateX Does
+
+- Highlight and label words or phrases in text.
+- Define connections and relationships between labeled items.
+- See a live knowledge graph of your structured annotations.
+- Export clean, structured data for use in AI and NLP pipelines.
+- Runs fully on-prem, keeping all your data private and secure.
+
+
+## 🚀 Why Use AnnotateX?
+- To create high-quality training data for NLP and large language models.
+- To build reliable, structured datasets quickly and clearly.
+- To maintain full control over your sensitive or private text data.
+
+## 🧩 In Short:
+
+AnnotateX helps you easily turn plain text into structured data, ready for AI and analytics.
+
+## Highlights
 
 - **Multi-Document Workspace** – load an entire folder (txt/pdf), navigate with arrow buttons or `⌥ ←/→`, and see progress + status for each asset.
 - **Fluid Text Annotation** – select spans directly in the editor to summon a floating label palette. Badges display label, sentiment, and metadata inline.
