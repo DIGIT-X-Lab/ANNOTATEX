@@ -1,17 +1,26 @@
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="./public/assets/Annotatex-dark-mode.png" />
-  <img alt="AnnotateX" src="./public/assets/Annotatex-light-mode.png" />
-</picture>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./public/assets/Annotatex-dark-mode.png" />
+    <img alt="AnnotateX" src="./public/assets/Annotatex-light-mode.png" />
+  </picture>
+</p>
 
-# AnnotateX
+<p align="center">
+  <img src="https://img.shields.io/badge/version-1.0.0-00b8d9?style=flat-square&labelColor=111827&color=00b8d9" alt="Version" />
+  <img src="https://img.shields.io/badge/license-MIT-34d399?style=flat-square&labelColor=111827" alt="License" />
+  <img src="https://img.shields.io/badge/deploy-docker-8b5cf6?style=flat-square&labelColor=111827" alt="Docker" />
+</p>
 
-> Transform free-form text into structured, reviewable intelligence.
+<p align="center">
+  <img src="https://img.shields.io/badge/React-7ff4ff?style=flat-square&logo=react&logoColor=111827" alt="React" />
+  <img src="https://img.shields.io/badge/TypeScript-d8e6ff?style=flat-square&logo=typescript&logoColor=3178C6" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Tailwind-d0f5ff?style=flat-square&logo=tailwindcss&logoColor=38BDF8" alt="Tailwind" />
+  <img src="https://img.shields.io/badge/shadcn/ui-f1d4ff?style=flat-square&logo=radix-ui&logoColor=6E59A5" alt="shadcn" />
+  <img src="https://img.shields.io/badge/Vite-ffe0cc?style=flat-square&logo=vite&logoColor=FF7A18" alt="Vite" />
+  <img src="https://img.shields.io/badge/React%20Flow-cff8e6?style=flat-square&logo=react&logoColor=0A0A0A" alt="React Flow" />
+</p>
 
 AnnotateX is a fully on-prem annotation workspace that combines a precision text editor, schema workbench, and interactive knowledge graph. Everything you tag stays in sync across the editor, JSON inspector, exports, and graph view—ready for downstream NLP, analytics, or LLM tuning.
-
-![AnnotateX](https://img.shields.io/badge/version-1.0.0-00B8D9)
-![License](https://img.shields.io/badge/license-MIT-green)
-![Docker](https://img.shields.io/badge/docker-ready-blue)
 
 ---
 
@@ -87,11 +96,16 @@ A sample chest X-ray report is preloaded so you can see how AnnotateX validates 
 
 ## Documentation
 
-- Full docs: `README.app.md`
-- Technical guide: `docs/ANNOTATEX.md`
+- Product & architecture guide: `docs/ANNOTATEX.md`
 - Deployment: `DEPLOYMENT.md`
 
 ---
+
+## Branding Notes
+
+- Place GitHub banners at `public/assets/github-banner-light.png` and `public/assets/github-banner-dark.png`.
+- Swap `public/favicon.svg` with your lab mark for browser tabs.
+- Drop `public/brand-banner.jpg` to replace the in-app header hero.
 
 ## License
 
