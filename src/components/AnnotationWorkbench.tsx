@@ -94,12 +94,14 @@ export const AnnotationWorkbench = ({
         );
       case "boolean":
         return (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            <span>No</span>
             <Switch
               checked={Boolean(currentValue)}
               onCheckedChange={(checked) => handleMetadataChange(selectedAnnotation.id, property.id, checked)}
+              aria-label={property.name}
             />
-            <span className="text-xs text-muted-foreground">{Boolean(currentValue) ? "Yes" : "No"}</span>
+            <span>Yes</span>
           </div>
         );
       default:
