@@ -127,14 +127,12 @@ export const TextEditor = ({
     }
   };
 
-  const handleAnnotationRightClick = (annotation: Annotation, e: React.MouseEvent) => {
+  const handleRemoveAnnotation = (annotation: Annotation, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     
-    if (window.confirm(`Remove "${annotation.text}" (${annotation.label}) annotation?`)) {
-      onRemoveAnnotation(annotation.id);
-      toast.success("Annotation removed");
-    }
+    onRemoveAnnotation(annotation.id);
+    toast.success(`Removed "${annotation.label}" annotation`);
   };
 
   const renderAnnotatedText = () => {
@@ -167,12 +165,15 @@ export const TextEditor = ({
             color: "inherit",
           }}
           onClick={(e) => handleAnnotationClick(annotation, e)}
-          onContextMenu={(e) => handleAnnotationRightClick(annotation, e)}
-          title="Right-click to remove"
+          title="Click ✕ to remove"
         >
           {annotation.text}
           <span className="ml-1 text-xs opacity-70">{annotation.label}</span>
-          <span className="ml-1 text-xs opacity-0 group-hover:opacity-100 transition-opacity">
+          <span 
+            className="ml-1.5 text-xs opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:text-destructive"
+            onClick={(e) => handleRemoveAnnotation(annotation, e)}
+            title="Remove annotation"
+          >
             ✕
           </span>
         </Badge>
@@ -221,13 +222,10 @@ export const TextEditor = ({
 
       <div className="text-sm text-muted-foreground mb-2 space-y-1">
         <div>
-          <strong>Add annotation:</strong> Select text → press <kbd className="px-2 py-1 bg-muted rounded text-xs">/</kbd> → choose label
+          <strong>Add:</strong> Select text → press <kbd className="px-2 py-1 bg-muted rounded text-xs">/</kbd> → choose label
         </div>
         <div>
-          <strong>Remove annotation:</strong> Right-click on any highlighted annotation
-        </div>
-        <div className="text-xs opacity-75">
-          💡 Hover over annotations to see the ✕ delete indicator
+          <strong>Remove:</strong> Hover over annotation → click the <span className="text-destructive font-bold">✕</span>
         </div>
       </div>
 
