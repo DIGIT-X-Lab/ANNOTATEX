@@ -17,7 +17,7 @@ import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
 import pdfWorkerSrc from "pdfjs-dist/build/pdf.worker?url";
 
 const SAMPLE_TEXT =
-  "MRI BRAIN WITHOUT CONTRAST\n\nClinical History: 58-year-old with new onset headaches and visual aura.\n\nFindings:\n1. Focal T2/FLAIR hyperintensity involving the left occipital cortex with surrounding vasogenic edema.\n2. No acute hemorrhage or restricted diffusion.\n3. Ventricular size and midline structures are normal.\n\nImpression:\nLesion in the left occipital lobe consistent with low-grade neoplasm. Recommend correlation with ophthalmologic exam and follow-up imaging.";
+  "CHEST X-RAY (PA AND LATERAL)\n\nClinical History: 66-year-old with dyspnea; study extracted from MIMIC-CXR dataset.\n\nFindings:\n1. Patchy airspace opacities in the right mid and lower lung compatible with pneumonia.\n2. Mild cardiomegaly with prominent pulmonary vasculature.\n3. No pleural effusion or pneumothorax.\n\nImpression:\nRight lower-lobe consolidation consistent with infectious process. Recommend clinical correlation and short-term follow-up imaging.";
 
 const generateId = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto

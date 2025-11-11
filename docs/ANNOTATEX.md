@@ -220,16 +220,16 @@ Each feature will keep the “glassmorphic” aesthetic and avoid clutter—pref
 
 ---
 
-## 11. Sample Validation Flow
+## 11. Sample Validation Flow (MIMIC-CXR)
 
 AnnotateX's default dataset demonstrates how radiology teams validate structured outputs:
 
-1. **Sample Report** – MRI brain report describing a left occipital lesion.
-2. **Schema** – Lesion, Finding, Anatomy, Clinical History labels, each with configurable properties (location, laterality, severity, etc.).
-3. **AI JSON** – External model proposes structured fields (e.g., lesion location, severity). Annotators confirm or adjust by highlighting the source text and editing properties inline.
-4. **Export** – Final JSON reflects verified metadata ready for PACS, registries, or analytics. The CSV export includes every property column for auditing.
+1. **Sample Report** – Chest X-ray (MIMIC-CXR) with right lower-lobe consolidation.
+2. **Schema** – Lesion, Finding, Anatomy, Clinical History labels with properties such as location, laterality, severity, appearance, etc.
+3. **AI JSON** – External model proposes structured fields (lesion location, severity, impression). Annotators confirm or adjust by highlighting the source text and editing the type-aware property controls.
+4. **Export** – Final JSON/CSV reflects reviewer-verified metadata ready for PACS, registries, or analytics.
 
-Use the schema import drawer to load your own ontology or start from the provided templates, then follow the same flow for validating oncology, cardiology, or pathology reports.
+Use the schema import drawer to load your own ontology or start from provided templates, then follow the same flow for validating oncology, cardiology, or pathology reports.
 
 ---
 

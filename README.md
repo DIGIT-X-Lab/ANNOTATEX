@@ -81,33 +81,34 @@ The default Nginx config (see `nginx.conf`) serves the optimized build at `http:
 
 ---
 
-## Radiology Validation Example
+## Radiology Validation Example (MIMIC-CXR)
 
-AnnotateX ships with a sample MRI brain report and a radiology schema so you can see how the tool validates structured AI output:
+AnnotateX now ships with a sample MIMIC-CXR chest X-ray report plus a matching schema:
 
 1. **Incoming AI JSON**
 
    ```json
    {
      "lesion": {
-       "location": "left occipital cortex",
-       "laterality": "left",
-       "appearance": "T2/FLAIR hyperintensity"
+       "location": "right lower lobe",
+       "laterality": "right",
+       "appearance": "patchy airspace opacity"
      },
      "finding": {
        "severity": "moderate",
-       "impression": "Low-grade neoplasm"
+       "impression": "Pneumonia"
      }
    }
    ```
 
 2. **Validate in AnnotateX**
 
-   - Load the default report and highlight the relevant clauses (“Focal T2/FLAIR hyperintensity… left occipital cortex…”).
-   - Set the metadata in the inline property cards (location, laterality, severity, impression).
-   - Live JSON panel mirrors your updates so you can compare with the AI’s suggestion or export the corrected structure.
+   - Highlight “Patchy airspace opacities in the right mid and lower lung…” and assign the **Lesion** label.
+   - Set properties (`location=right lower lobe`, `laterality=right`, `appearance=patchy airspace opacity`).
+   - Tag the impression sentence as a **Finding** and record severity/impression.
+   - The JSON panel mirrors each edit so you can compare with the AI output before exporting.
 
-This same workflow applies to any clinical note or radiology exam—just import your schema (lesions, findings, anatomy, etc.) and confirm each structured field before it reaches downstream systems.
+Use the same flow for any MIMIC-CXR note: import your ontology if needed, confirm each structured field, and export the reviewer-validated JSON.
 
 ---
 
