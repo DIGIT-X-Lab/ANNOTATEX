@@ -149,6 +149,7 @@ All colors MUST be HSL.
     backdrop-filter: blur(40px);
     -webkit-backdrop-filter: blur(40px);
     overflow: hidden;
+    border-radius: 9999px;
   }
 
   .dark .annotation-group {
