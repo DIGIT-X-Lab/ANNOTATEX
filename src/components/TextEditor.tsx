@@ -475,7 +475,7 @@ export const TextEditor = ({
       <div
         key={`${primary.id}-group`}
         className={cn(
-          "annotation-highlight annotation-group mx-0.5 inline-flex flex-wrap items-center gap-3 px-4 py-2 rounded-2xl"
+          "annotation-highlight annotation-group mx-0.5 inline-flex flex-wrap items-center gap-3 px-5 py-2 rounded-full"
         )}
         style={{
           backgroundImage: backgroundGradient,
