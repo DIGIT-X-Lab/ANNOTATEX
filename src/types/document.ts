@@ -1,4 +1,4 @@
-import type { Annotation, Relationship } from "@/types/annotation";
+import type { Annotation, AnnotationSuggestion, Relationship } from "@/types/annotation";
 
 export type DocumentType = "txt" | "pdf" | "unknown";
 
@@ -10,6 +10,7 @@ export interface DocumentRecord {
   lastModified?: number;
   text: string;
   annotations: Annotation[];
+  suggestions: AnnotationSuggestion[];
   relationships: Relationship[];
   status: "ready" | "loading" | "error";
   error?: string;

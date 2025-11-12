@@ -34,6 +34,8 @@ export interface Annotation {
   label: string;
   color: string;
   metadata?: AnnotationMetadata;
+  context?: string;
+  propertyEvidence?: Record<string, string>;
 }
 
 export interface Relationship {
@@ -44,3 +46,11 @@ export interface Relationship {
 }
 
 export type AnnotationMetadata = Record<string, string | number | boolean | null | undefined>;
+
+export type SuggestionStatus = "pending" | "accepted" | "rejected" | "superseded";
+
+export interface AnnotationSuggestion extends Annotation {
+  status: SuggestionStatus;
+  confidence?: number;
+  source?: string;
+}
