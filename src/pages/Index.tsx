@@ -176,14 +176,6 @@ const Index = () => {
     }
   }, [activeDocument, selectedAnnotationId]);
 
-  useEffect(() => {
-    if (!assistEnabled || !activeDocumentId) return;
-    const currentDoc = documents.find((doc) => doc.id === activeDocumentId);
-    if (currentDoc && currentDoc.suggestions.length === 0 && currentDoc.text.trim()) {
-      void runAssistSuggestions(activeDocumentId);
-    }
-  }, [assistEnabled, activeDocumentId, documents, runAssistSuggestions]);
-
   const mutateActiveDocument = useCallback(
     (updater: (doc: DocumentRecord) => DocumentRecord) => {
       if (!activeDocumentId) return;
@@ -469,6 +461,14 @@ const Index = () => {
     if (!activeDocumentId) return;
     void runAssistSuggestions(activeDocumentId, { force: true });
   };
+
+  useEffect(() => {
+    if (!assistEnabled || !activeDocumentId) return;
+    const currentDoc = documents.find((doc) => doc.id === activeDocumentId);
+    if (currentDoc && currentDoc.suggestions.length === 0 && currentDoc.text.trim()) {
+      void runAssistSuggestions(activeDocumentId);
+    }
+  }, [assistEnabled, activeDocumentId, documents, runAssistSuggestions]);
 
   const annotations = activeDocument?.annotations ?? [];
   const relationships = activeDocument?.relationships ?? [];
