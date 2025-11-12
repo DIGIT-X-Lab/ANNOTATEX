@@ -52,6 +52,19 @@ const buildGradient = (colors: string[]) => {
   return `linear-gradient(135deg, ${stops.join(", ")})`;
 };
 
+const getContrastingText = (hex: string) => {
+  const sanitized = hex.replace("#", "");
+  if (sanitized.length !== 6) {
+    return "#0f1116";
+  }
+  const bigint = Number.parseInt(sanitized, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.6 ? "#0f1116" : "#f5f7fb";
+};
+
 interface TextEditorProps {
   text: string;
   setText: (text: string) => void;
@@ -492,12 +505,13 @@ export const TextEditor = ({
               key={annotation.id}
               variant="secondary"
               className={cn(
-                "annotation-chip cursor-pointer inline-flex items-center gap-1.5 border px-3 py-1 text-xs font-semibold rounded-full",
+                "annotation-chip cursor-pointer inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-full border border-transparent",
                 selectedAnnotationId === annotation.id && "ring-2 ring-primary/60",
               )}
               style={{
-                backgroundColor: annotation.color + "20",
-                borderColor: annotation.color + "90",
+                backgroundColor: annotation.color,
+                color: getContrastingText(annotation.color),
+                boxShadow: `0 12px 22px -14px ${hexToRgba(annotation.color, 0.7)}`,
               }}
               onClick={(e) => handleAnnotationClick(annotation, e)}
             >
