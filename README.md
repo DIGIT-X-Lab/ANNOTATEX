@@ -53,6 +53,7 @@ AnnotateX helps you easily turn plain text into structured data, ready for AI an
 - **Schema-as-a-Feature** – define labels, colors, and optional metadata requirements. Schema changes apply instantly across the UI.
 - **Annotation Workbench** – inspect spans, update metadata, review linked relationships, and bulk-clear edges without leaving the page.
 - **Interactive Graph** – every annotation becomes a draggable node. Draw edges to propose relationships, confirm direction + type in a dialog, and delete edges with a keystroke.
+- **Assist Mode (Pre-Annotation)** – toggle inline model hints, preview ghost labels beside the text, and accept/dismiss them from a review queue with progress tracking.
 - **Live JSON + Export** – JSON view mirrors current state; export JSON/CSV per document with RFC‑4180-safe CSV quoting.
 - **On-Prem Ready** – stateless Vite/React front-end deploys behind your firewall via Docker, Docker Compose, or any static host + API stack.
 
@@ -117,6 +118,17 @@ A sample chest X-ray report is preloaded so you can see how AnnotateX validates 
 1. Select spans like “Patchy airspace opacities in the right mid and lower lung…”
 2. Assign schema labels (Cardiomegaly, Pleural effusion, Pneumothorax, Consolidation, Pneumonia) and fill in their properties (presence, severity).
 3. Live JSON mirrors each edit; export the reviewer-approved structure for downstream systems.
+
+---
+
+## Assist Mode Primer
+
+1. Toggle **Assist Mode** in the Text Annotation toolbar to request pre-annotations from your on-prem inference adapter (the default heuristics simulate an Ollama-style service).
+2. Click **Refresh** to fetch suggestions. Ghost badges appear inline with dashed borders, and a side review queue lists every candidate with confidence, source, and status.
+3. Accept or dismiss suggestions inline or from the queue—accepted items instantly become real annotations, while rejected ones stay hidden for that document.
+4. Manual annotations automatically retire overlapping suggestions, so the progress bar always reflects what still needs attention.
+
+Swap `generatePreAnnotationSuggestions` (in `src/lib/preAnnotation.ts`) with your own API call when you are ready to connect Triton, Ollama, or another local model server.
 
 ---
 

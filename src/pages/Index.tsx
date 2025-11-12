@@ -15,6 +15,7 @@ import type { DocumentRecord, DocumentType } from "@/types/document";
 import { toast } from "sonner";
 import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
 import pdfWorkerSrc from "pdfjs-dist/build/pdf.worker?url";
+import { generatePreAnnotationSuggestions } from "@/lib/preAnnotation";
 
 const SAMPLE_TEXT =
   "CHEST X-RAY (PA AND LATERAL)\n\nClinical History: 66-year-old with dyspnea.\n\nFindings:\n1. Patchy airspace opacities in the right mid and lower lung compatible with pneumonia.\n2. Mild cardiomegaly with prominent pulmonary vasculature.\n3. No pleural effusion or pneumothorax.\n\nImpression:\nRight lower-lobe consolidation consistent with infectious process. Recommend clinical correlation and short-term follow-up imaging.";
@@ -31,6 +32,7 @@ const createSampleDocument = (): DocumentRecord => ({
   size: SAMPLE_TEXT.length,
   text: SAMPLE_TEXT,
   annotations: [],
+  suggestions: [],
   relationships: [],
   status: "ready",
   origin: "sample",
@@ -61,6 +63,9 @@ const extractTextFromPdf = async (file: File): Promise<string> => {
   }
   return text.trim();
 };
+
+const spansOverlap = (aStart: number, aEnd: number, bStart: number, bEnd: number) =>
+  aStart < bEnd && aEnd > bStart;
 
 const Index = () => {
   const [documents, setDocuments] = useState<DocumentRecord[]>([createSampleDocument()]);
@@ -147,6 +152,8 @@ const Index = () => {
   });
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [assistEnabled, setAssistEnabled] = useState(false);
+  const [assistLoading, setAssistLoading] = useState(false);
 
   const activeDocument = useMemo(
     () => documents.find((doc) => doc.id === activeDocumentId) ?? documents[0] ?? null,
@@ -169,6 +176,14 @@ const Index = () => {
     }
   }, [activeDocument, selectedAnnotationId]);
 
+  useEffect(() => {
+    if (!assistEnabled || !activeDocumentId) return;
+    const currentDoc = documents.find((doc) => doc.id === activeDocumentId);
+    if (currentDoc && currentDoc.suggestions.length === 0 && currentDoc.text.trim()) {
+      void runAssistSuggestions(activeDocumentId);
+    }
+  }, [assistEnabled, activeDocumentId, documents, runAssistSuggestions]);
+
   const mutateActiveDocument = useCallback(
     (updater: (doc: DocumentRecord) => DocumentRecord) => {
       if (!activeDocumentId) return;
@@ -187,6 +202,11 @@ const Index = () => {
     mutateActiveDocument((doc) => ({
       ...doc,
       annotations: [...doc.annotations, annotation],
+      suggestions: doc.suggestions.map((suggestion) =>
+        suggestion.status === "pending" && spansOverlap(annotation.start, annotation.end, suggestion.start, suggestion.end)
+          ? { ...suggestion, status: "superseded" }
+          : suggestion,
+      ),
     }));
     setSelectedAnnotationId(annotation.id);
   };
@@ -198,6 +218,52 @@ const Index = () => {
       relationships: doc.relationships.filter((r) => r.source !== id && r.target !== id),
     }));
     setSelectedAnnotationId((prev) => (prev === id ? null : prev));
+  };
+
+  const handleAcceptSuggestion = (suggestionId: string) => {
+    let createdAnnotationId: string | null = null;
+    mutateActiveDocument((doc) => {
+      const suggestion = doc.suggestions.find((s) => s.id === suggestionId);
+      if (!suggestion) {
+        return doc;
+      }
+      const newAnnotation: Annotation = {
+        id: `ann-${generateId()}`,
+        start: suggestion.start,
+        end: suggestion.end,
+        text: suggestion.text,
+        labelId: suggestion.labelId,
+        label: suggestion.label,
+        color: suggestion.color,
+        metadata: suggestion.metadata,
+      };
+      createdAnnotationId = newAnnotation.id;
+      return {
+        ...doc,
+        annotations: [...doc.annotations, newAnnotation],
+        suggestions: doc.suggestions.map((s) =>
+          s.id === suggestionId ? { ...s, status: "accepted" } : s,
+        ),
+      };
+    });
+    if (createdAnnotationId) {
+      setSelectedAnnotationId(createdAnnotationId);
+      toast.success("Suggestion accepted", {
+        description: "Converted into a live annotation.",
+      });
+    }
+  };
+
+  const handleRejectSuggestion = (suggestionId: string) => {
+    mutateActiveDocument((doc) => ({
+      ...doc,
+      suggestions: doc.suggestions.map((suggestion) =>
+        suggestion.id === suggestionId ? { ...suggestion, status: "rejected" } : suggestion,
+      ),
+    }));
+    toast.info("Suggestion dismissed", {
+      description: "Hidden from the assist queue for this document.",
+    });
   };
 
   const handleUpdateAnnotationMetadata = (id: string, metadata: Partial<AnnotationMetadata>) => {
@@ -302,6 +368,7 @@ const Index = () => {
             lastModified: file.lastModified,
             text,
             annotations: [],
+            suggestions: [],
             relationships: [],
             status: "ready",
             origin: "uploaded",
@@ -315,6 +382,7 @@ const Index = () => {
             lastModified: file.lastModified,
             text: "",
             annotations: [],
+            suggestions: [],
             relationships: [],
             status: "error",
             error: error instanceof Error ? error.message : "Failed to process file",
@@ -342,9 +410,70 @@ const Index = () => {
     }
   };
 
+  const runAssistSuggestions = useCallback(
+    async (docId: string, options: { force?: boolean } = {}) => {
+      const { force = false } = options;
+      const targetDocument = documents.find((doc) => doc.id === docId);
+      if (!targetDocument) return;
+      if (!targetDocument.text.trim()) {
+        toast.error("No text to analyze for suggestions.");
+        return;
+      }
+      if (!force && targetDocument.suggestions.length > 0) {
+        return;
+      }
+
+      setAssistLoading(true);
+      try {
+        const generated = await Promise.resolve(
+          generatePreAnnotationSuggestions(targetDocument.text, schema, targetDocument.annotations),
+        );
+
+        setDocuments((prev) =>
+          prev.map((doc) =>
+            doc.id === docId
+              ? {
+                  ...doc,
+                  suggestions: generated,
+                }
+              : doc,
+          ),
+        );
+
+        if (generated.length) {
+          toast.success(
+            `Assist surfaced ${generated.length} suggestion${generated.length === 1 ? "" : "s"}`,
+          );
+        } else {
+          toast.info("Assist couldn't find suggestions for this document.");
+        }
+      } catch (error) {
+        toast.error("Assist engine failed", {
+          description: error instanceof Error ? error.message : "Unknown error",
+        });
+      } finally {
+        setAssistLoading(false);
+      }
+    },
+    [documents, schema],
+  );
+
+  const handleToggleAssist = (enabled: boolean) => {
+    setAssistEnabled(enabled);
+    if (enabled && activeDocumentId) {
+      void runAssistSuggestions(activeDocumentId);
+    }
+  };
+
+  const handleRefreshSuggestions = () => {
+    if (!activeDocumentId) return;
+    void runAssistSuggestions(activeDocumentId, { force: true });
+  };
+
   const annotations = activeDocument?.annotations ?? [];
   const relationships = activeDocument?.relationships ?? [];
   const text = activeDocument?.text ?? SAMPLE_TEXT;
+  const suggestions = activeDocument?.suggestions ?? [];
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -384,6 +513,13 @@ const Index = () => {
             selectedAnnotationId={selectedAnnotationId}
             onSelectAnnotation={setSelectedAnnotationId}
             onUpdateAnnotationMetadata={handleUpdateAnnotationMetadata}
+            suggestions={suggestions}
+            assistEnabled={assistEnabled}
+            assistLoading={assistLoading}
+            onToggleAssist={handleToggleAssist}
+            onAcceptSuggestion={handleAcceptSuggestion}
+            onRejectSuggestion={handleRejectSuggestion}
+            onRefreshSuggestions={handleRefreshSuggestions}
           />
         </ResizablePanel>
 

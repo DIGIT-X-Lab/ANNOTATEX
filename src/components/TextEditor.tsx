@@ -6,11 +6,21 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Link as LinkIcon, Sparkles } from "lucide-react";
-import type { Annotation, Schema, Relationship, AnnotationMetadata, LabelProperty } from "@/types/annotation";
+import { Progress } from "@/components/ui/progress";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Check, Link as LinkIcon, Loader2, RefreshCw, Sparkles, X } from "lucide-react";
+import type {
+  Annotation,
+  Schema,
+  Relationship,
+  AnnotationMetadata,
+  LabelProperty,
+  AnnotationSuggestion,
+} from "@/types/annotation";
 import { toast } from "sonner";
 import { FloatingLabelMenu } from "./FloatingLabelMenu";
 import { cn } from "@/lib/utils";
+import { buildDefaultMetadata } from "@/lib/annotations";
 
 interface TextEditorProps {
   text: string;
@@ -24,6 +34,13 @@ interface TextEditorProps {
   selectedAnnotationId: string | null;
   onSelectAnnotation: (id: string | null) => void;
   onUpdateAnnotationMetadata: (id: string, metadata: Partial<AnnotationMetadata>) => void;
+  suggestions: AnnotationSuggestion[];
+  assistEnabled: boolean;
+  assistLoading: boolean;
+  onToggleAssist: (enabled: boolean) => void;
+  onAcceptSuggestion: (id: string) => void;
+  onRejectSuggestion: (id: string) => void;
+  onRefreshSuggestions: () => void;
 }
 
 export const TextEditor = ({
@@ -38,6 +55,13 @@ export const TextEditor = ({
   selectedAnnotationId,
   onSelectAnnotation,
   onUpdateAnnotationMetadata,
+  suggestions,
+  assistEnabled,
+  assistLoading,
+  onToggleAssist,
+  onAcceptSuggestion,
+  onRejectSuggestion,
+  onRefreshSuggestions,
 }: TextEditorProps) => {
   const [selection, setSelection] = useState<{ start: number; end: number; text: string } | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
@@ -50,6 +74,24 @@ export const TextEditor = ({
     ? schema.labels.find((label) => label.id === selectedAnnotation.labelId)
     : null;
   const labelProperties = selectedLabel?.properties ?? [];
+  const pendingCount = suggestions.filter((suggestion) => suggestion.status === "pending").length;
+  const visiblePendingSuggestions = assistEnabled
+    ? suggestions.filter((suggestion) => suggestion.status === "pending")
+    : [];
+  const resolvedSuggestions = suggestions.length - pendingCount;
+  const suggestionProgress = suggestions.length
+    ? Math.round((resolvedSuggestions / suggestions.length) * 100)
+    : 0;
+  const sortedSuggestions = [...suggestions].sort((a, b) => {
+    if (a.status === b.status) {
+      return (b.confidence ?? 0) - (a.confidence ?? 0);
+    }
+    if (a.status === "pending") return -1;
+    if (b.status === "pending") return 1;
+    if (a.status === "accepted") return -1;
+    if (b.status === "accepted") return 1;
+    return 0;
+  });
 
   const handleMetadataChange = (
     annotationId: string,
@@ -254,25 +296,7 @@ export const TextEditor = ({
     const label = schema.labels.find((l) => l.id === labelId);
     if (!label) return;
 
-    const metadata: AnnotationMetadata | undefined =
-      label.properties && label.properties.length
-        ? label.properties.reduce<AnnotationMetadata>((acc, property) => {
-            switch (property.type) {
-              case "boolean":
-                acc[property.id] = false;
-                break;
-              case "number":
-                acc[property.id] = null;
-                break;
-              case "select":
-                acc[property.id] = property.options?.[0] ?? "";
-                break;
-              default:
-                acc[property.id] = "";
-            }
-            return acc;
-          }, {})
-        : undefined;
+    const metadata = buildDefaultMetadata(label);
 
     const newAnnotation: Annotation = {
       id: `ann-${Date.now()}`,
@@ -332,72 +356,131 @@ export const TextEditor = ({
     toast.success(`Removed "${annotation.label}" annotation`);
   };
 
+  const renderAnnotationBadge = (annotation: Annotation) => (
+    <Badge
+      key={annotation.id}
+      variant="secondary"
+      className={cn(
+        "annotation-highlight cursor-pointer mx-0.5 group relative border",
+        selectedAnnotationId === annotation.id && "ring-2 ring-primary/60",
+      )}
+      style={{
+        backgroundColor: annotation.color + "20",
+        borderColor: annotation.color,
+        color: "inherit",
+      }}
+      onClick={(e) => handleAnnotationClick(annotation, e)}
+      title="Click to select. Hover ✕ to remove."
+    >
+      {annotation.text}
+      <span className="ml-1" data-exclude-offset="true">
+        <span className="text-xs opacity-70 select-none">{annotation.label}</span>
+      </span>
+      <span
+        data-exclude-offset="true"
+        className="ml-1.5 text-xs opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:text-destructive select-none"
+        onClick={(e) => handleRemoveAnnotation(annotation, e)}
+        title="Remove annotation"
+      >
+        ✕
+      </span>
+    </Badge>
+  );
+
+  const renderSuggestionBadge = (suggestion: AnnotationSuggestion) => (
+    <Badge
+      key={suggestion.id}
+      variant="secondary"
+      className="annotation-highlight mx-0.5 group relative border border-dashed bg-transparent text-foreground/90"
+      style={{
+        borderColor: suggestion.color,
+        backgroundColor: suggestion.color + "10",
+      }}
+    >
+      {suggestion.text}
+      <span className="ml-1" data-exclude-offset="true">
+        <span className="text-[11px] uppercase tracking-wide opacity-70 select-none">
+          Suggested · {suggestion.label}
+        </span>
+      </span>
+      <span
+        data-exclude-offset="true"
+        className="ml-2 inline-flex items-center gap-1 select-none"
+      >
+        {suggestion.confidence && (
+          <span className="text-[11px] text-muted-foreground bg-background/80 px-1.5 py-0.5 rounded-full border border-border/60">
+            {Math.round(suggestion.confidence * 100)}%
+          </span>
+        )}
+        <button
+          type="button"
+          className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20"
+          onClick={(event) => {
+            event.stopPropagation();
+            onAcceptSuggestion(suggestion.id);
+          }}
+          title="Accept suggestion"
+        >
+          <Check className="w-3 h-3" />
+        </button>
+        <button
+          type="button"
+          className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-destructive/40 bg-destructive/10 text-destructive hover:bg-destructive/20"
+          onClick={(event) => {
+            event.stopPropagation();
+            onRejectSuggestion(suggestion.id);
+          }}
+          title="Dismiss suggestion"
+        >
+          <X className="w-3 h-3" />
+        </button>
+      </span>
+    </Badge>
+  );
+
   const renderAnnotatedText = () => {
-    if (annotations.length === 0) {
+    const spans = [
+      ...annotations.map((annotation) => ({ ...annotation, kind: "annotation" as const })),
+      ...visiblePendingSuggestions.map((suggestion) => ({ ...suggestion, kind: "suggestion" as const })),
+    ].sort((a, b) => {
+      if (a.start === b.start) {
+        if (a.kind === b.kind) return 0;
+        return a.kind === "annotation" ? -1 : 1;
+      }
+      return a.start - b.start;
+    });
+
+    if (spans.length === 0) {
       return <span>{text}</span>;
     }
 
-    const sortedAnnotations = [...annotations].sort((a, b) => a.start - b.start);
     const elements: JSX.Element[] = [];
     let currentIndex = 0;
 
-    sortedAnnotations.forEach((annotation, idx) => {
-      // Add text before annotation
-      if (currentIndex < annotation.start) {
+    spans.forEach((span, idx) => {
+      if (currentIndex < span.start) {
         elements.push(
-          <span key={`text-${idx}`}>{text.substring(currentIndex, annotation.start)}</span>
+          <span key={`text-${idx}-${span.start}`}>{text.substring(currentIndex, span.start)}</span>
         );
       }
 
-      // Add annotation
       elements.push(
-        <Badge
-          key={annotation.id}
-          variant="secondary"
-          className={cn(
-            "annotation-highlight cursor-pointer mx-0.5 group relative border",
-            selectedAnnotationId === annotation.id && "ring-2 ring-primary/60",
-          )}
-          style={{
-            backgroundColor: annotation.color + "20",
-            borderColor: annotation.color,
-            color: "inherit",
-          }}
-          onClick={(e) => handleAnnotationClick(annotation, e)}
-          title="Click to select. Hover ✕ to remove."
-        >
-          {annotation.text}
-          <span className="ml-1" data-exclude-offset="true">
-            <span className="text-xs opacity-70 select-none">{annotation.label}</span>
-          </span>
-          <span
-            data-exclude-offset="true"
-            className="ml-1.5 text-xs opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:text-destructive select-none"
-            onClick={(e) => handleRemoveAnnotation(annotation, e)}
-            title="Remove annotation"
-          >
-            ✕
-          </span>
-        </Badge>
+        span.kind === "annotation"
+          ? renderAnnotationBadge(span)
+          : renderSuggestionBadge(span),
       );
 
-      currentIndex = annotation.end;
+      currentIndex = Math.max(currentIndex, span.end);
     });
 
-    // Add remaining text
     if (currentIndex < text.length) {
-      elements.push(<span key="text-end">{text.substring(currentIndex)}</span>);
+      elements.push(<span key="text-tail">{text.substring(currentIndex)}</span>);
     }
 
     return elements;
   };
 
-  const handleAiAssist = () => {
-    toast.info("AI Assist coming soon!", {
-      description: "Auto-suggest labels based on context",
-    });
-  };
-
+  const totalSuggestions = suggestions.length;
   const linkingDisabled = !schema.relationTypes.length;
 
   return (
@@ -408,6 +491,44 @@ export const TextEditor = ({
           <p className="text-xs text-muted-foreground">Select spans to assign labels and enrich metadata.</p>
         </div>
         <div className="flex flex-wrap gap-3 items-center justify-end">
+          <div className="flex items-center gap-3 rounded-full border border-border/80 bg-background/80 px-4 py-2 shadow-sm">
+            <div className="hidden sm:flex items-center justify-center w-8 h-8 rounded-full bg-primary/15 text-primary">
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <div className="space-y-0.5">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Assist Mode</p>
+              <p className="text-sm font-medium">
+                {assistEnabled
+                  ? pendingCount
+                    ? `${pendingCount} pending suggestion${pendingCount === 1 ? "" : "s"}`
+                    : totalSuggestions
+                      ? "All suggestions reviewed"
+                      : assistLoading
+                        ? "Fetching suggestions..."
+                        : "Ready for hints"
+                  : "Off · Enable to preview model hints"}
+              </p>
+            </div>
+            <Switch checked={assistEnabled} onCheckedChange={onToggleAssist} aria-label="Toggle assist mode" />
+          </div>
+          {assistEnabled && (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onRefreshSuggestions}
+                disabled={assistLoading}
+                className="min-w-[120px]"
+              >
+                {assistLoading ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                )}
+                {assistLoading ? "Fetching..." : "Refresh"}
+              </Button>
+            </>
+          )}
           <Button
             variant={isEditingSource ? "default" : "outline"}
             size="sm"
@@ -448,10 +569,6 @@ export const TextEditor = ({
             <LinkIcon className="w-4 h-4 mr-2" />
             {linkingMode ? "Cancel Linking" : "Link Annotations"}
           </Button>
-          <Button variant="outline" size="sm" onClick={handleAiAssist}>
-            <Sparkles className="w-4 h-4 mr-2" />
-            AI Assist
-          </Button>
         </div>
       </div>
 
@@ -466,46 +583,135 @@ export const TextEditor = ({
         </div>
       )}
 
-      <div className="text-sm text-muted-foreground mb-2 space-y-1">
-        <div className="flex items-center gap-2">
-          <span className="text-primary">✨</span>
-          <div>
-            <strong>Add:</strong> Simply select any text - a beautiful label menu appears!
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-destructive">✕</span>
-          <div>
-            <strong>Remove:</strong> Hover over annotation {"->"} click the <span className="text-destructive font-bold">✕</span>
-          </div>
-        </div>
-      </div>
-
-      {selectedAnnotation && labelProperties.length > 0 && (
-        <div className="rounded-lg border border-dashed border-primary/40 bg-primary/5 px-4 py-4 space-y-3 text-sm">
-          <div>
-            <p className="text-xs uppercase text-muted-foreground tracking-wide">
-              Properties · {selectedLabel?.name}
-            </p>
-            <p className="font-medium text-foreground line-clamp-2">{selectedAnnotation.text}</p>
-          </div>
-          <div className="grid gap-3 md:grid-cols-2">
-            {labelProperties.map((property) => (
-              <div key={property.id} className="space-y-1">
-                <Label className="text-xs uppercase text-muted-foreground">{property.name}</Label>
-                {renderPropertyControl(property)}
+      <div className={cn("grid gap-6", assistEnabled ? "xl:grid-cols-[minmax(0,1fr)_320px]" : "")}>
+        <div className="space-y-4">
+          <div className="text-sm text-muted-foreground space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="text-primary">✨</span>
+              <div>
+                <strong>Add:</strong> Simply select any text - a beautiful label menu appears!
               </div>
-            ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-destructive">✕</span>
+              <div>
+                <strong>Remove:</strong> Hover over annotation {"->"} click the <span className="text-destructive font-bold">✕</span>
+              </div>
+            </div>
+          </div>
+
+          {selectedAnnotation && labelProperties.length > 0 && (
+            <div className="rounded-lg border border-dashed border-primary/40 bg-primary/5 px-4 py-4 space-y-3 text-sm">
+              <div>
+                <p className="text-xs uppercase text-muted-foreground tracking-wide">
+                  Properties · {selectedLabel?.name}
+                </p>
+                <p className="font-medium text-foreground line-clamp-2">{selectedAnnotation.text}</p>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                {labelProperties.map((property) => (
+                  <div key={property.id} className="space-y-1">
+                    <Label className="text-xs uppercase text-muted-foreground">{property.name}</Label>
+                    {renderPropertyControl(property)}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div
+            ref={textRef}
+            className="min-h-[400px] p-6 bg-card border border-border rounded-lg leading-relaxed text-base cursor-text"
+            style={{ userSelect: "text", WebkitUserSelect: "text", MozUserSelect: "text" }}
+          >
+            {renderAnnotatedText()}
           </div>
         </div>
-      )}
 
-      <div
-        ref={textRef}
-        className="min-h-[400px] p-6 bg-card border border-border rounded-lg leading-relaxed text-base cursor-text"
-        style={{ userSelect: "text", WebkitUserSelect: "text", MozUserSelect: "text" }}
-      >
-        {renderAnnotatedText()}
+        {assistEnabled && (
+          <aside className="rounded-2xl border border-border/80 bg-gradient-to-b from-background/80 to-muted/70 backdrop-blur-xl p-4 shadow-[0_30px_70px_rgba(15,23,42,0.25)] space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase text-muted-foreground tracking-wide">Review queue</p>
+                <p className="text-sm font-semibold">
+                  {pendingCount
+                    ? `${pendingCount} pending`
+                    : totalSuggestions
+                      ? "All caught up"
+                      : assistLoading
+                        ? "Fetching suggestions..."
+                        : "No suggestions yet"}
+                </p>
+              </div>
+              <Badge variant="secondary" className="uppercase tracking-wide text-[11px]">
+                {resolvedSuggestions}/{totalSuggestions || 0} reviewed
+              </Badge>
+            </div>
+            <Progress value={suggestionProgress} className="h-2" />
+            {totalSuggestions === 0 && !assistLoading ? (
+              <div className="rounded-xl border border-dashed border-border/70 bg-background/60 p-6 text-center text-sm text-muted-foreground space-y-2">
+                <Sparkles className="w-5 h-5 text-primary mx-auto" />
+                <p>Run the assist engine to preload smart suggestions.</p>
+                <p className="text-xs">Use the refresh button above anytime.</p>
+              </div>
+            ) : (
+              <ScrollArea className="h-[360px] pr-3">
+                <div className="space-y-3">
+                  {sortedSuggestions.map((suggestion) => (
+                    <div
+                      key={suggestion.id}
+                      className={cn(
+                        "rounded-xl border p-3 text-sm space-y-2 transition-all",
+                        suggestion.status === "pending"
+                          ? "border-primary/30 bg-primary/5"
+                          : suggestion.status === "accepted"
+                            ? "border-emerald-300/60 bg-emerald-50/60 text-emerald-900 dark:text-emerald-100 dark:bg-emerald-500/10"
+                            : "border-border/80 bg-background/60 opacity-70",
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                            {suggestion.label}
+                          </p>
+                          <p className="font-medium line-clamp-3">{suggestion.text}</p>
+                        </div>
+                        {suggestion.confidence && (
+                          <span className="text-xs font-semibold text-muted-foreground">
+                            {Math.round(suggestion.confidence * 100)}%
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>{suggestion.source ?? "Assist"}</span>
+                        <span className="capitalize">{suggestion.status}</span>
+                      </div>
+                      {suggestion.status === "pending" && (
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            className="h-8 flex-1"
+                            onClick={() => onAcceptSuggestion(suggestion.id)}
+                          >
+                            Accept
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 flex-1"
+                            onClick={() => onRejectSuggestion(suggestion.id)}
+                          >
+                            Dismiss
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
+          </aside>
+        )}
       </div>
 
       <FloatingLabelMenu

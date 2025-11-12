@@ -39,6 +39,12 @@ interface Annotation {
   metadata?: AnnotationMetadata;
 }
 
+interface AnnotationSuggestion extends Annotation {
+  status: "pending" | "accepted" | "rejected" | "superseded";
+  confidence?: number;
+  source?: string;
+}
+
 interface Relationship {
   id: string;
   source: string;   // annotation id
@@ -72,6 +78,7 @@ interface DocumentRecord {
   lastModified?: number;
   text: string;
   annotations: Annotation[];
+  suggestions: AnnotationSuggestion[];
   relationships: Relationship[];
   status: "ready" | "loading" | "error";
   error?: string;
@@ -144,7 +151,21 @@ Edge labels use the schema’s friendly name and sit on a lightly tinted backgro
 
 ---
 
-## 7. Export Format
+## 7. Assist Mode (Pre-Annotation)
+
+AnnotateX now ships with a native pre-annotation loop to keep humans in control while benefitting from model hints:
+
+1. **Toggle Assist Mode** – The switch in `TextEditor` requests suggestions for the active document. `runAssistSuggestions` currently calls `generatePreAnnotationSuggestions` (heuristics for the sample radiology report) but the function is intentionally isolated so you can replace it with an Ollama/Triton/REST adapter.
+2. **Ghost badges inline** – Pending suggestions render beside the text with dashed borders, a “Suggested · Label” caption, and quick accept/dismiss chips. Accepting creates a real `Annotation`; rejecting hides it for the remainder of the session.
+3. **Review queue** – A sidecar panel lists every suggestion (pending/accepted/rejected) with confidence, source, and status, plus a progress bar so reviewers know when they have touched every model proposal.
+4. **State safety** – `DocumentRecord.suggestions` lives alongside `annotations`. Manual annotations automatically mark overlapping suggestions as `superseded`, ensuring the queue never conflicts with confirmed spans.
+5. **Extensibility** – Swap the heuristics in `src/lib/preAnnotation.ts` for an API call, or stream multiple model snapshots and merge results before updating `suggestions`. The UI already exposes the toggle, refresh action, and progress instrumentation.
+
+This keeps AnnotateX fully on-prem while providing an elegant entry point for active-learning style workflows.
+
+---
+
+## 8. Export Format
 
 ### JSON
 
@@ -187,7 +208,7 @@ and appends one column per custom property (e.g., `Location`, `Severity`, `Notes
 
 ---
 
-## 8. Deployment Checklist
+## 9. Deployment Checklist
 
 1. **Build**: `npm run build` (produces `dist/`)
 2. **Containerize**: Use `Dockerfile` (serves via Nginx). Ensure environment variables (if any) are injected at runtime.
@@ -197,20 +218,20 @@ and appends one column per custom property (e.g., `Location`, `Severity`, `Notes
 
 ---
 
-## 9. Roadmap Considerations
+## 10. Roadmap Considerations
 
 Planned enhancements (high-level):
 
 - **Command palette** – `⌘K` to jump between annotations, labels, documents, or schema actions.
 - **Schema templates & validations** – shareable ontologies plus rule enforcement (e.g., cardinality constraints).
-- **AI-assisted suggestions** – optional inference layer for candidate spans and relationships.
+- **Active-learning metrics** – capture accept/reject stats and emit feedback bundles for retraining loops.
 - **Collaboration hooks** – multi-user presence, annotation comments, audit log.
 
 Each feature will keep the “glassmorphic” aesthetic and avoid clutter—preferring drawers, popovers, and keyboard shortcuts.
 
 ---
 
-## 10. Branding
+## 11. Branding
 
 - Brand palette lives in `src/index.css`. Change the CSS custom properties (`--primary`, `--accent`, etc.) to match your institution’s style guide.
 - The header/badge copy is controlled inside `src/components/Header.tsx`.
@@ -220,7 +241,7 @@ Each feature will keep the “glassmorphic” aesthetic and avoid clutter—pref
 
 ---
 
-## 11. Sample Validation Flow (MIMIC-CXR)
+## 12. Sample Validation Flow (MIMIC-CXR)
 
 AnnotateX's default dataset demonstrates how radiology teams validate structured outputs:
 
