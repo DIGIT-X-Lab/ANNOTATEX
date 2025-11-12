@@ -92,6 +92,22 @@ docker run --rm -p 8080:80 annotatex
 
 The default Nginx config (see `nginx.conf`) serves the optimized build at `http://localhost:8080`.
 
+### Secret Scanning (gitleaks)
+
+Install [gitleaks](https://github.com/gitleaks/gitleaks) locally (macOS example shown; download a release binary for Linux/Windows):
+
+```bash
+brew install gitleaks
+```
+
+Run a scan before committing:
+
+```bash
+npm run scan:secrets
+```
+
+This command applies the repo’s `gitleaks.toml` policy, redacts findings, and mirrors the GitHub Actions workflow (`.github/workflows/gitleaks.yml`) that runs on every push and pull request.
+
 ---
 
 ## Example Workflow

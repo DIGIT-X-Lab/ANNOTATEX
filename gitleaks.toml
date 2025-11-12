@@ -1,0 +1,12 @@
+title = "AnnotateX Gitleaks Policy"
+description = "Baseline configuration for detecting committed secrets."
+
+[allowlist]
+description = "Ignore generated or third-party artifacts that can trigger false positives."
+paths = [
+  "dist/.*",
+  "node_modules/.*",
+  "docs/.*",
+  "public/assets/.*",
+  "bun.lockb"
+]
