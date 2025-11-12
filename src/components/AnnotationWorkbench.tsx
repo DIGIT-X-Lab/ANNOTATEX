@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import type { Annotation, AnnotationMetadata, Relationship, Schema, LabelProperty } from "@/types/annotation";
 import { Trash2, X } from "lucide-react";
+import { PropertyEvidenceHint } from "./PropertyEvidenceHint";
 
 interface AnnotationWorkbenchProps {
   annotations: Annotation[];
@@ -224,12 +225,25 @@ export const AnnotationWorkbench = ({
                     </Label>
                     {labelProperties.length > 0 ? (
                       <div className="space-y-3">
-                        {labelProperties.map((property) => (
-                          <div key={property.id} className="space-y-1">
-                            <p className="text-xs text-muted-foreground">{property.name}</p>
-                            {renderPropertyControl(property)}
-                          </div>
-                        ))}
+                        {labelProperties.map((property) => {
+                          const evidence = selectedAnnotation.propertyEvidence?.[property.id];
+                          const value = selectedAnnotation.metadata?.[property.id];
+                          const fallback = selectedAnnotation.context ?? selectedAnnotation.text;
+                          return (
+                            <div key={property.id} className="space-y-1">
+                              <div className="flex items-center gap-1 text-xs uppercase text-muted-foreground">
+                                <span>{property.name}</span>
+                                <PropertyEvidenceHint
+                                  evidence={evidence}
+                                  fallback={fallback}
+                                  propertyName={property.name}
+                                  propertyValue={value}
+                                />
+                              </div>
+                              {renderPropertyControl(property)}
+                            </div>
+                          );
+                        })}
                       </div>
                     ) : (
                       <p className="text-sm text-muted-foreground">

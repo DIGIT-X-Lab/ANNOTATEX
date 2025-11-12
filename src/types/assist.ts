@@ -11,7 +11,7 @@ export interface AssistConfig {
 
 export const defaultAssistConfig: AssistConfig = {
   mode: "heuristic",
-  maxSuggestions: 24,
+  maxSuggestions: 200,
   timeoutMs: 10000,
   ollamaHost: "http://localhost:11434",
   ollamaModel: "llama3.2:3b",

@@ -34,6 +34,8 @@ export interface Annotation {
   label: string;
   color: string;
   metadata?: AnnotationMetadata;
+  context?: string;
+  propertyEvidence?: Record<string, string>;
 }
 
 export interface Relationship {

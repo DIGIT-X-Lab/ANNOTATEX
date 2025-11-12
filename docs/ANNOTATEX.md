@@ -157,10 +157,10 @@ Edge labels use the schema’s friendly name and sit on a lightly tinted backgro
 AnnotateX now ships with a native pre-annotation loop to keep humans in control while benefitting from model hints:
 
 1. **Pick an engine** – The ✨ gear opens `AssistSettingsDrawer`, letting reviewers stay on heuristics or point to an Ollama endpoint (host, model, temperature, timeout). Config is stored in `localStorage` per browser profile.
-2. **Toggle Assist Mode** – The switch in `TextEditor` requests suggestions for the active document. `runAssistSuggestions` calls `generateAssistSuggestions`, which chooses between the heuristics or Ollama adapter (with auto-fallback if the endpoint fails).
-3. **Ghost badges inline** – Pending suggestions render beside the text with dashed borders, a “Suggested · Label” caption, and quick accept/dismiss chips. Accepting creates a real `Annotation`; rejecting hides it for the remainder of the session.
+2. **Toggle Assist Mode** – The switch in `TextEditor` requests suggestions for the active document. `runAssistSuggestions` calls `generateAssistSuggestions`, which streams the *entire* document to the adapter and expects JSON entries with `labelId`, verbatim `text`, zero-based `start`/`end`, a `context` sentence/paragraph, and per-property `{ value, evidence }` pairs.
+3. **Ghost badges inline** – Pending suggestions render beside the text with dashed borders, a “Suggested · Label” caption, and the supporting context quote. Quick accept/dismiss chips keep reviewers in flow while the evidence stays visible.
 4. **Review queue** – A sidecar panel lists every suggestion (pending/accepted/rejected) with confidence, source, and status, plus a progress bar so reviewers know when they have touched every model proposal.
-5. **State safety** – `DocumentRecord.suggestions` lives alongside `annotations`. Manual annotations automatically mark overlapping suggestions as `superseded`, ensuring the queue never conflicts with confirmed spans.
+5. **State safety** – `DocumentRecord.suggestions` lives alongside `annotations`. Manual annotations automatically mark overlapping suggestions as `superseded`, and heuristics silently backfill labels the model skipped so every schema item stays represented.
 6. **Extensibility** – Replace the Ollama logic in `src/lib/assistProviders.ts` with any REST/gRPC adapter (Triton, OpenVINO, etc.). The UI already exposes the toggle, refresh action, and progress instrumentation without needing further tweaks.
 
 This keeps AnnotateX fully on-prem while providing an elegant entry point for active-learning style workflows.

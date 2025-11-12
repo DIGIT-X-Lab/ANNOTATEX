@@ -259,6 +259,8 @@ const Index = () => {
         label: suggestion.label,
         color: suggestion.color,
         metadata: suggestion.metadata,
+        context: suggestion.context,
+        propertyEvidence: suggestion.propertyEvidence,
       };
       createdAnnotationId = newAnnotation.id;
       return {
@@ -292,11 +294,33 @@ const Index = () => {
   const handleUpdateAnnotationMetadata = (id: string, metadata: Partial<AnnotationMetadata>) => {
     mutateActiveDocument((doc) => ({
       ...doc,
-      annotations: doc.annotations.map((annotation) =>
-        annotation.id === id
-          ? { ...annotation, metadata: { ...annotation.metadata, ...metadata } }
-          : annotation,
-      ),
+      annotations: doc.annotations.map((annotation) => {
+        if (annotation.id !== id) {
+          return annotation;
+        }
+
+        const updatedMetadata = { ...annotation.metadata, ...metadata };
+        let updatedEvidence = annotation.propertyEvidence
+          ? { ...annotation.propertyEvidence }
+          : undefined;
+
+        if (updatedEvidence) {
+          Object.keys(metadata).forEach((key) => {
+            if (key in updatedEvidence) {
+              delete updatedEvidence[key];
+            }
+          });
+          if (Object.keys(updatedEvidence).length === 0) {
+            updatedEvidence = undefined;
+          }
+        }
+
+        return {
+          ...annotation,
+          metadata: updatedMetadata,
+          propertyEvidence: updatedEvidence,
+        };
+      }),
     }));
   };
 

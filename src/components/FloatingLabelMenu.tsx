@@ -5,18 +5,22 @@ import type { Label } from "@/types/annotation";
 interface FloatingLabelMenuProps {
   labels: Label[];
   position: { x: number; y: number } | null;
-  onSelectLabel: (labelId: string) => void;
+  onApplyLabels: (labelIds: string[]) => void;
   onClose: () => void;
 }
 
-export const FloatingLabelMenu = ({ labels, position, onSelectLabel, onClose }: FloatingLabelMenuProps) => {
+export const FloatingLabelMenu = ({ labels, position, onApplyLabels, onClose }: FloatingLabelMenuProps) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const [adjustedPosition, setAdjustedPosition] = useState(position);
+  const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
   const dragOffset = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     if (!position) {
       setAdjustedPosition(null);
+      setSelectedLabels([]);
+    } else {
+      setSelectedLabels([]);
     }
   }, [position]);
 
@@ -113,6 +117,19 @@ export const FloatingLabelMenu = ({ labels, position, onSelectLabel, onClose }: 
     document.removeEventListener("mouseup", handleMouseUp);
   };
 
+  const toggleLabel = (labelId: string) => {
+    setSelectedLabels((current) =>
+      current.includes(labelId) ? current.filter((id) => id !== labelId) : [...current, labelId],
+    );
+  };
+
+  const applySelection = () => {
+    if (!selectedLabels.length) return;
+    onApplyLabels(selectedLabels);
+    setSelectedLabels([]);
+    onClose();
+  };
+
   return (
     <div
       ref={menuRef}
@@ -126,24 +143,39 @@ export const FloatingLabelMenu = ({ labels, position, onSelectLabel, onClose }: 
       </div>
 
       <div className="flex flex-wrap gap-2 max-w-[320px] max-h-60 overflow-y-auto pr-1">
-        {labels.map((label) => (
-          <button
-            key={label.id}
-            onClick={() => {
-              onSelectLabel(label.id);
-              onClose();
-            }}
-            className="label-button-glass rounded-lg px-3 py-2 text-sm font-medium flex items-center gap-2 border border-white/10"
-            style={{ boxShadow: `0 0 10px ${label.color}20` }}
-          >
-            <div className="w-3 h-3 rounded-full ring-1 ring-white/30" style={{ backgroundColor: label.color }} />
-            <span>{label.name}</span>
-          </button>
-        ))}
+        {labels.map((label) => {
+          const isSelected = selectedLabels.includes(label.id);
+          return (
+            <button
+              key={label.id}
+              type="button"
+              onClick={() => toggleLabel(label.id)}
+              className="label-button-glass rounded-lg px-3 py-2 text-sm font-medium flex items-center gap-2 border transition-colors"
+              style={{
+                boxShadow: `0 0 10px ${label.color}20`,
+                borderColor: isSelected ? label.color : "rgba(255,255,255,0.08)",
+                backgroundColor: isSelected ? `${label.color}20` : "transparent",
+              }}
+            >
+              <div className="w-3 h-3 rounded-full ring-1 ring-white/30" style={{ backgroundColor: label.color }} />
+              <span>{label.name}</span>
+            </button>
+          );
+        })}
       </div>
 
-      <div className="mt-2 pt-2 border-t border-white/20 text-xs text-muted-foreground opacity-70">
-        Press ESC to cancel
+      <div className="mt-3 pt-2 border-t border-white/20 flex items-center justify-between gap-3">
+        <div className="text-xs text-muted-foreground opacity-70">
+          {selectedLabels.length ? `${selectedLabels.length} selected` : "Pick one or more labels"}
+        </div>
+        <button
+          type="button"
+          className="rounded-lg bg-primary/80 text-white text-xs font-semibold px-3 py-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+          disabled={!selectedLabels.length}
+          onClick={applySelection}
+        >
+          Apply
+        </button>
       </div>
     </div>
   );
