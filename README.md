@@ -123,12 +123,13 @@ A sample chest X-ray report is preloaded so you can see how AnnotateX validates 
 
 ## Assist Mode Primer
 
-1. Toggle **Assist Mode** in the Text Annotation toolbar to request pre-annotations from your on-prem inference adapter (the default heuristics simulate an Ollama-style service).
+1. Click the ✨ gear button to choose the assist engine: stay on the built-in heuristics or point to your on-prem Ollama endpoint (host + model are stored locally in your browser).
+2. Toggle **Assist Mode** in the Text Annotation toolbar to request pre-annotations from your selected adapter.
 2. Click **Refresh** to fetch suggestions. Ghost badges appear inline with dashed borders, and a side review queue lists every candidate with confidence, source, and status.
 3. Accept or dismiss suggestions inline or from the queue—accepted items instantly become real annotations, while rejected ones stay hidden for that document.
 4. Manual annotations automatically retire overlapping suggestions, so the progress bar always reflects what still needs attention.
 
-Swap `generatePreAnnotationSuggestions` (in `src/lib/preAnnotation.ts`) with your own API call when you are ready to connect Triton, Ollama, or another local model server.
+Drop custom adapters into `src/lib/assistProviders.ts` if you want to call Triton, Ollama, or any other on-prem inference stack.
 
 ---
 

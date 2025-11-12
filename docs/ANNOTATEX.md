@@ -125,6 +125,7 @@ All surface components receive callbacks to mutate this shared state, keeping ev
 | `GraphPanel` | `src/components/GraphPanel.tsx` | Render nodes/edges via React Flow, accept drag-to-connect gestures, confirm direction/type |
 | `JsonViewer` | `src/components/JsonViewer.tsx` | Preview normalized JSON in real time |
 | `ExportDialog` | `src/components/ExportDialog.tsx` | JSON/CSV export with RFC‑4180-safe quoting |
+| `AssistSettingsDrawer` | `src/components/AssistSettingsDrawer.tsx` | Configure Assist engines (heuristic vs Ollama) and test connectivity |
 
 ---
 
@@ -155,11 +156,12 @@ Edge labels use the schema’s friendly name and sit on a lightly tinted backgro
 
 AnnotateX now ships with a native pre-annotation loop to keep humans in control while benefitting from model hints:
 
-1. **Toggle Assist Mode** – The switch in `TextEditor` requests suggestions for the active document. `runAssistSuggestions` currently calls `generatePreAnnotationSuggestions` (heuristics for the sample radiology report) but the function is intentionally isolated so you can replace it with an Ollama/Triton/REST adapter.
-2. **Ghost badges inline** – Pending suggestions render beside the text with dashed borders, a “Suggested · Label” caption, and quick accept/dismiss chips. Accepting creates a real `Annotation`; rejecting hides it for the remainder of the session.
-3. **Review queue** – A sidecar panel lists every suggestion (pending/accepted/rejected) with confidence, source, and status, plus a progress bar so reviewers know when they have touched every model proposal.
-4. **State safety** – `DocumentRecord.suggestions` lives alongside `annotations`. Manual annotations automatically mark overlapping suggestions as `superseded`, ensuring the queue never conflicts with confirmed spans.
-5. **Extensibility** – Swap the heuristics in `src/lib/preAnnotation.ts` for an API call, or stream multiple model snapshots and merge results before updating `suggestions`. The UI already exposes the toggle, refresh action, and progress instrumentation.
+1. **Pick an engine** – The ✨ gear opens `AssistSettingsDrawer`, letting reviewers stay on heuristics or point to an Ollama endpoint (host, model, temperature, timeout). Config is stored in `localStorage` per browser profile.
+2. **Toggle Assist Mode** – The switch in `TextEditor` requests suggestions for the active document. `runAssistSuggestions` calls `generateAssistSuggestions`, which chooses between the heuristics or Ollama adapter (with auto-fallback if the endpoint fails).
+3. **Ghost badges inline** – Pending suggestions render beside the text with dashed borders, a “Suggested · Label” caption, and quick accept/dismiss chips. Accepting creates a real `Annotation`; rejecting hides it for the remainder of the session.
+4. **Review queue** – A sidecar panel lists every suggestion (pending/accepted/rejected) with confidence, source, and status, plus a progress bar so reviewers know when they have touched every model proposal.
+5. **State safety** – `DocumentRecord.suggestions` lives alongside `annotations`. Manual annotations automatically mark overlapping suggestions as `superseded`, ensuring the queue never conflicts with confirmed spans.
+6. **Extensibility** – Replace the Ollama logic in `src/lib/assistProviders.ts` with any REST/gRPC adapter (Triton, OpenVINO, etc.). The UI already exposes the toggle, refresh action, and progress instrumentation without needing further tweaks.
 
 This keeps AnnotateX fully on-prem while providing an elegant entry point for active-learning style workflows.
 

@@ -8,14 +8,17 @@ import { SchemaPanel } from "@/components/SchemaPanel";
 import { ExportDialog } from "@/components/ExportDialog";
 import { AnnotationWorkbench } from "@/components/AnnotationWorkbench";
 import { GraphPanel } from "@/components/GraphPanel";
+import { AssistSettingsDrawer } from "@/components/AssistSettingsDrawer";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Annotation, Schema, Relationship, AnnotationMetadata } from "@/types/annotation";
 import type { DocumentRecord, DocumentType } from "@/types/document";
+import type { AssistConfig } from "@/types/assist";
+import { defaultAssistConfig } from "@/types/assist";
 import { toast } from "sonner";
 import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
 import pdfWorkerSrc from "pdfjs-dist/build/pdf.worker?url";
-import { generatePreAnnotationSuggestions } from "@/lib/preAnnotation";
+import { generateAssistSuggestions, testAssistConnection } from "@/lib/assistProviders";
 
 const SAMPLE_TEXT =
   "CHEST X-RAY (PA AND LATERAL)\n\nClinical History: 66-year-old with dyspnea.\n\nFindings:\n1. Patchy airspace opacities in the right mid and lower lung compatible with pneumonia.\n2. Mild cardiomegaly with prominent pulmonary vasculature.\n3. No pleural effusion or pneumothorax.\n\nImpression:\nRight lower-lobe consolidation consistent with infectious process. Recommend clinical correlation and short-term follow-up imaging.";
@@ -66,6 +69,8 @@ const extractTextFromPdf = async (file: File): Promise<string> => {
 
 const spansOverlap = (aStart: number, aEnd: number, bStart: number, bEnd: number) =>
   aStart < bEnd && aEnd > bStart;
+
+const ASSIST_CONFIG_KEY = "annotatex.assistConfig";
 
 const Index = () => {
   const [documents, setDocuments] = useState<DocumentRecord[]>([createSampleDocument()]);
@@ -154,11 +159,37 @@ const Index = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [assistEnabled, setAssistEnabled] = useState(false);
   const [assistLoading, setAssistLoading] = useState(false);
+  const [assistConfig, setAssistConfig] = useState<AssistConfig>(defaultAssistConfig);
+  const [isAssistSettingsOpen, setIsAssistSettingsOpen] = useState(false);
+  const [isTestingAssist, setIsTestingAssist] = useState(false);
+  const [assistTestMessage, setAssistTestMessage] = useState<string | null>(null);
 
   const activeDocument = useMemo(
     () => documents.find((doc) => doc.id === activeDocumentId) ?? documents[0] ?? null,
     [documents, activeDocumentId],
   );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const stored = window.localStorage.getItem(ASSIST_CONFIG_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored) as AssistConfig;
+        setAssistConfig({ ...defaultAssistConfig, ...parsed });
+      }
+    } catch (error) {
+      console.warn("Failed to load assist config, using defaults.", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(ASSIST_CONFIG_KEY, JSON.stringify(assistConfig));
+    } catch (error) {
+      console.warn("Failed to persist assist config.", error);
+    }
+  }, [assistConfig]);
 
   useEffect(() => {
     if (!activeDocument && documents[0]) {
@@ -417,8 +448,11 @@ const Index = () => {
 
       setAssistLoading(true);
       try {
-        const generated = await Promise.resolve(
-          generatePreAnnotationSuggestions(targetDocument.text, schema, targetDocument.annotations),
+        const { suggestions: generated, sourceLabel } = await generateAssistSuggestions(
+          targetDocument.text,
+          schema,
+          targetDocument.annotations,
+          assistConfig,
         );
 
         setDocuments((prev) =>
@@ -434,7 +468,7 @@ const Index = () => {
 
         if (generated.length) {
           toast.success(
-            `Assist surfaced ${generated.length} suggestion${generated.length === 1 ? "" : "s"}`,
+            `Assist (${sourceLabel}) suggested ${generated.length} span${generated.length === 1 ? "" : "s"}`,
           );
         } else {
           toast.info("Assist couldn't find suggestions for this document.");
@@ -447,7 +481,7 @@ const Index = () => {
         setAssistLoading(false);
       }
     },
-    [documents, schema],
+    [assistConfig, documents, schema],
   );
 
   const handleToggleAssist = (enabled: boolean) => {
@@ -462,6 +496,26 @@ const Index = () => {
     void runAssistSuggestions(activeDocumentId, { force: true });
   };
 
+  const handleUpdateAssistConfig = (next: AssistConfig) => {
+    setAssistConfig(next);
+  };
+
+  const handleTestAssistEngine = async () => {
+    setIsTestingAssist(true);
+    setAssistTestMessage(null);
+    try {
+      const message = await testAssistConnection(assistConfig);
+      setAssistTestMessage(message);
+      toast.success("Assist engine reachable", { description: message });
+    } catch (error) {
+      const description = error instanceof Error ? error.message : "Unknown error";
+      setAssistTestMessage(description);
+      toast.error("Assist engine test failed", { description });
+    } finally {
+      setIsTestingAssist(false);
+    }
+  };
+
   useEffect(() => {
     if (!assistEnabled || !activeDocumentId) return;
     const currentDoc = documents.find((doc) => doc.id === activeDocumentId);
@@ -474,6 +528,8 @@ const Index = () => {
   const relationships = activeDocument?.relationships ?? [];
   const text = activeDocument?.text ?? SAMPLE_TEXT;
   const suggestions = activeDocument?.suggestions ?? [];
+  const assistEngineLabel =
+    assistConfig.mode === "ollama" ? `Ollama · ${assistConfig.ollamaModel}` : "Heuristic";
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -517,6 +573,8 @@ const Index = () => {
             assistEnabled={assistEnabled}
             assistLoading={assistLoading}
             onToggleAssist={handleToggleAssist}
+            assistEngineLabel={assistEngineLabel}
+            onOpenAssistSettings={() => setIsAssistSettingsOpen(true)}
             onAcceptSuggestion={handleAcceptSuggestion}
             onRejectSuggestion={handleRejectSuggestion}
             onRefreshSuggestions={handleRefreshSuggestions}
@@ -577,6 +635,15 @@ const Index = () => {
       </ResizablePanelGroup>
 
       <ExportDialog documents={documents} activeDocumentId={activeDocumentId} schema={schema} />
+      <AssistSettingsDrawer
+        open={isAssistSettingsOpen}
+        onOpenChange={setIsAssistSettingsOpen}
+        config={assistConfig}
+        onConfigChange={handleUpdateAssistConfig}
+        onTestConnection={handleTestAssistEngine}
+        testing={isTestingAssist}
+        testMessage={assistTestMessage}
+      />
     </div>
   );
 };

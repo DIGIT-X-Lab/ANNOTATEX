@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Check, Link as LinkIcon, Loader2, RefreshCw, Sparkles, X } from "lucide-react";
+import { Check, Link as LinkIcon, Loader2, RefreshCw, Settings2, Sparkles, X } from "lucide-react";
 import type {
   Annotation,
   Schema,
@@ -38,6 +38,8 @@ interface TextEditorProps {
   assistEnabled: boolean;
   assistLoading: boolean;
   onToggleAssist: (enabled: boolean) => void;
+  assistEngineLabel: string;
+  onOpenAssistSettings: () => void;
   onAcceptSuggestion: (id: string) => void;
   onRejectSuggestion: (id: string) => void;
   onRefreshSuggestions: () => void;
@@ -59,6 +61,8 @@ export const TextEditor = ({
   assistEnabled,
   assistLoading,
   onToggleAssist,
+  assistEngineLabel,
+  onOpenAssistSettings,
   onAcceptSuggestion,
   onRejectSuggestion,
   onRefreshSuggestions,
@@ -508,9 +512,19 @@ export const TextEditor = ({
                         : "Ready for hints"
                   : "Off · Enable to preview model hints"}
               </p>
+              <p className="text-[11px] text-muted-foreground">Engine · {assistEngineLabel}</p>
             </div>
             <Switch checked={assistEnabled} onCheckedChange={onToggleAssist} aria-label="Toggle assist mode" />
           </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onOpenAssistSettings}
+            className="border border-transparent hover:border-border"
+            title="Assist settings"
+          >
+            <Settings2 className="w-4 h-4" />
+          </Button>
           {assistEnabled && (
             <>
               <Button
