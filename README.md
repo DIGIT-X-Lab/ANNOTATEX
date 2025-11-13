@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.0.0-00b8d9?style=flat-square&labelColor=111827&color=00b8d9" alt="Version" />
+  <img src="https://img.shields.io/badge/version-0.1.0-00b8d9?style=flat-square&labelColor=111827&color=00b8d9" alt="Version" />
   <img src="https://img.shields.io/badge/Apache-2.0-34d399?style=flat-square&labelColor=111827&logo=apache&logoColor=F24E1E" alt="Apache" />
   <img src="https://img.shields.io/badge/Docker-ready-8b5cf6?style=flat-square&labelColor=111827&logo=docker&logoColor=0DB7ED" alt="Docker" />
 </p>
