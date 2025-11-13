@@ -6,6 +6,9 @@
 </p>
 
 <p align="center">
+  <a href="https://doi.org/10.5281/zenodo.17601554">
+    <img src="https://img.shields.io/badge/DOI-10.5281%2Fzenodo.17601554-2563eb?style=flat-square&labelColor=111827&logo=zenodo&logoColor=ffffff" alt="DOI: 10.5281/zenodo.17601554" />
+  </a>
   <img src="https://img.shields.io/badge/version-0.1.0-00b8d9?style=flat-square&labelColor=111827&color=00b8d9" alt="Version" />
   <img src="https://img.shields.io/badge/Apache-2.0-34d399?style=flat-square&labelColor=111827&logo=apache&logoColor=F24E1E" alt="Apache" />
   <img src="https://img.shields.io/badge/Docker-ready-8b5cf6?style=flat-square&labelColor=111827&logo=docker&logoColor=0DB7ED" alt="Docker" />
