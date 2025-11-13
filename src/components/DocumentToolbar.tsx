@@ -77,6 +77,7 @@ export const DocumentToolbar = ({
           size="icon"
           onClick={onPreviousDocument}
           disabled={documents.length <= 1 || currentIndex <= 0}
+          title="Previous report (← or Alt+←)"
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
@@ -110,6 +111,7 @@ export const DocumentToolbar = ({
           size="icon"
           onClick={onNextDocument}
           disabled={documents.length <= 1 || currentIndex === documents.length - 1}
+          title="Next report (→ or Alt+→)"
         >
           <ChevronRight className="h-4 w-4" />
         </Button>

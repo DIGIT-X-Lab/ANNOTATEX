@@ -366,17 +366,27 @@ const Index = () => {
   useEffect(() => {
     const handleKeydown = (event: KeyboardEvent) => {
       const activeElement = document.activeElement as HTMLElement | null;
+      const interactiveTags = new Set(["INPUT", "TEXTAREA", "SELECT"]);
+      const tagName = activeElement?.tagName ? activeElement.tagName.toUpperCase() : "";
       const isTyping =
         activeElement &&
-        (activeElement.tagName === "INPUT" ||
-          activeElement.tagName === "TEXTAREA" ||
-          activeElement.isContentEditable);
+        (interactiveTags.has(tagName) ||
+          activeElement.isContentEditable ||
+          activeElement.getAttribute("role") === "textbox");
       if (isTyping) return;
-      if (event.altKey && event.key === "ArrowRight") {
+
+      const isBareLeft =
+        event.key === "ArrowLeft" && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey;
+      const isBareRight =
+        event.key === "ArrowRight" && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey;
+      const isAltLeft = event.key === "ArrowLeft" && event.altKey;
+      const isAltRight = event.key === "ArrowRight" && event.altKey;
+
+      if (isBareRight || isAltRight) {
         event.preventDefault();
         handleNextDocument();
       }
-      if (event.altKey && event.key === "ArrowLeft") {
+      if (isBareLeft || isAltLeft) {
         event.preventDefault();
         handlePreviousDocument();
       }
