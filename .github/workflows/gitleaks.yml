@@ -18,8 +18,16 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Install gitleaks
+        shell: bash
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/gitleaks/gitleaks/master/scripts/install.sh | bash -s -- v8.18.2
+
       - name: Run gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        with:
-          config-path: gitleaks.toml
-          args: --source . --redact
+        shell: bash
+        run: |
+          ./gitleaks detect \
+            --config=gitleaks.toml \
+            --source . \
+            --redact \
+            --no-banner
