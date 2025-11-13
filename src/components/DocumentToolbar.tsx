@@ -71,25 +71,37 @@ export const DocumentToolbar = ({
 
   return (
     <div className="border-b border-border bg-muted/30 px-4 py-3 flex flex-wrap gap-4 items-center">
-      <div className="flex items-center gap-2 min-w-[240px]">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onPreviousDocument}
-          disabled={documents.length <= 1 || currentIndex <= 0}
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
+      <div className="flex items-center gap-3 min-w-0 flex-1">
+        <div className="flex items-center gap-2 shrink-0 w-[96px] justify-between">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onPreviousDocument}
+            disabled={documents.length <= 1 || currentIndex <= 0}
+            title="Previous document"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onNextDocument}
+            disabled={documents.length <= 1 || currentIndex === documents.length - 1}
+            title="Next document"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
 
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-card border border-border shadow-sm">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-card border border-border shadow-sm shrink-0">
             <TypeIcon className="h-5 w-5 text-primary" />
           </div>
-          <div>
-            <p className="text-sm font-semibold">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold truncate max-w-[320px]" title={activeDocument?.name}>
               {activeDocument ? activeDocument.name : "Untitled Document"}
             </p>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               <span className="capitalize">{activeDocument?.type ?? "txt"}</span>
               <span>·</span>
               <span>{formatSize(activeDocument?.size ?? 0)}</span>
@@ -104,15 +116,6 @@ export const DocumentToolbar = ({
             </div>
           </div>
         </div>
-
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onNextDocument}
-          disabled={documents.length <= 1 || currentIndex === documents.length - 1}
-        >
-          <ChevronRight className="h-4 w-4" />
-        </Button>
       </div>
 
       <div className="flex-1 min-w-[220px]">
