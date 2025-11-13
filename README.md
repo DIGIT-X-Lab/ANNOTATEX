@@ -147,14 +147,6 @@ Drop custom adapters into `src/lib/assistProviders.ts` if you want to call Trito
 - Product & architecture guide: `docs/ANNOTATEX.md`
 - Deployment: `DEPLOYMENT.md`
 
----
-
-## Branding Notes
-
-- Place GitHub banners at `public/assets/github-banner-light.png` and `public/assets/github-banner-dark.png`.
-- Swap `public/favicon.svg` with your lab mark for browser tabs.
-- Drop `public/brand-banner.jpg` to replace the in-app header hero.
-
 ## License
 
 Apache-2.0
