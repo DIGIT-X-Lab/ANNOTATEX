@@ -67,6 +67,7 @@ const getContrastingText = (hex: string) => {
 
 interface TextEditorProps {
   text: string;
+  cleanText?: string;
   setText: (text: string) => void;
   annotations: Annotation[];
   onAddAnnotation: (annotation: Annotation) => void;
@@ -80,16 +81,20 @@ interface TextEditorProps {
   suggestions: AnnotationSuggestion[];
   assistEnabled: boolean;
   assistLoading: boolean;
+  assistWarming: boolean;
   onToggleAssist: (enabled: boolean) => void;
   assistEngineLabel: string;
   onOpenAssistSettings: () => void;
   onAcceptSuggestion: (id: string) => void;
   onRejectSuggestion: (id: string) => void;
   onRefreshSuggestions: () => void;
+  onRunAssistAll: () => void;
+  isRunningAssistAll: boolean;
 }
 
 export const TextEditor = ({
   text,
+  cleanText,
   setText,
   annotations,
   onAddAnnotation,
@@ -103,12 +108,15 @@ export const TextEditor = ({
   suggestions,
   assistEnabled,
   assistLoading,
+  assistWarming,
   onToggleAssist,
   assistEngineLabel,
   onOpenAssistSettings,
   onAcceptSuggestion,
   onRejectSuggestion,
   onRefreshSuggestions,
+  onRunAssistAll,
+  isRunningAssistAll,
 }: TextEditorProps) => {
   const [selection, setSelection] = useState<{ start: number; end: number; text: string } | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
@@ -116,18 +124,20 @@ export const TextEditor = ({
   const [linkSource, setLinkSource] = useState<string | null>(null);
   const [linkType, setLinkType] = useState<string>(schema.relationTypes[0]?.id ?? "related");
   const [isEditingSource, setIsEditingSource] = useState(false);
+  const [showCleanView, setShowCleanView] = useState(false);
   const textRef = useRef<HTMLDivElement>(null);
   const selectedLabel = selectedAnnotation
     ? schema.labels.find((label) => label.id === selectedAnnotation.labelId)
     : null;
   const labelProperties = selectedLabel?.properties ?? [];
+  const totalSuggestions = suggestions.length;
   const pendingCount = suggestions.filter((suggestion) => suggestion.status === "pending").length;
   const visiblePendingSuggestions = assistEnabled
     ? suggestions.filter((suggestion) => suggestion.status === "pending")
     : [];
-  const resolvedSuggestions = suggestions.length - pendingCount;
-  const suggestionProgress = suggestions.length
-    ? Math.round((resolvedSuggestions / suggestions.length) * 100)
+  const resolvedSuggestions = totalSuggestions - pendingCount;
+  const suggestionProgress = totalSuggestions
+    ? Math.round((resolvedSuggestions / totalSuggestions) * 100)
     : 0;
   const sortedSuggestions = [...suggestions].sort((a, b) => {
     if (a.status === b.status) {
@@ -139,6 +149,18 @@ export const TextEditor = ({
     if (b.status === "accepted") return 1;
     return 0;
   });
+
+  const assistStatusMessage = assistEnabled
+    ? pendingCount
+      ? `${pendingCount} pending suggestion${pendingCount === 1 ? "" : "s"}`
+      : totalSuggestions
+        ? "All suggestions reviewed"
+        : assistWarming
+          ? "Preparing AI Assist..."
+          : assistLoading
+            ? "Fetching suggestions..."
+            : "Ready for hints"
+    : "Off · Enable to preview AI hints";
 
   const groupedSuggestions = useMemo(() => {
     const groups = new Map<
@@ -170,6 +192,22 @@ export const TextEditor = ({
 
     return Array.from(groups.values()).sort((a, b) => a.start - b.start);
   }, [sortedSuggestions]);
+
+  const canShowCleanView = Boolean(cleanText && cleanText.trim().length);
+
+  useEffect(() => {
+    if (!canShowCleanView && showCleanView) {
+      setShowCleanView(false);
+    }
+  }, [canShowCleanView, showCleanView]);
+
+  useEffect(() => {
+    if (showCleanView) {
+      setIsEditingSource(false);
+      setLinkingMode(false);
+      setLinkSource(null);
+    }
+  }, [showCleanView]);
 
   const handleMetadataChange = (
     annotationId: string,
@@ -643,8 +681,7 @@ export const TextEditor = ({
     return elements;
   };
 
-  const totalSuggestions = suggestions.length;
-  const linkingDisabled = !schema.relationTypes.length;
+  const linkingDisabled = showCleanView || !schema.relationTypes.length;
 
   return (
     <>
@@ -659,6 +696,8 @@ export const TextEditor = ({
               variant={isEditingSource ? "default" : "outline"}
               size="sm"
               onClick={() => setIsEditingSource((prev) => !prev)}
+              disabled={showCleanView}
+              title={showCleanView ? "Disable clean view to edit the source" : undefined}
             >
               {isEditingSource ? "Lock Text" : "Edit Source"}
             </Button>
@@ -702,18 +741,8 @@ export const TextEditor = ({
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
                 <div>
-                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Assist Mode</p>
-                  <p className="text-base font-semibold text-foreground">
-                    {assistEnabled
-                      ? pendingCount
-                        ? `${pendingCount} pending suggestion${pendingCount === 1 ? "" : "s"}`
-                        : totalSuggestions
-                          ? "All suggestions reviewed"
-                          : assistLoading
-                            ? "Fetching suggestions..."
-                            : "Ready for hints"
-                      : "Off · Enable to preview model hints"}
-                  </p>
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">AI Assist</p>
+                  <p className="text-base font-semibold text-foreground">{assistStatusMessage}</p>
                   <p className="text-xs text-muted-foreground flex items-center gap-1">
                     <Sparkles className="w-3.5 h-3.5 text-primary" />
                     Engine · {assistEngineLabel}
@@ -735,149 +764,193 @@ export const TextEditor = ({
                   onCheckedChange={onToggleAssist}
                   aria-label="Toggle assist mode"
                   className="scale-110"
+                  disabled={isRunningAssistAll}
+                  title={isRunningAssistAll ? "Disabled while batch assist is running" : undefined}
                 />
                 <Badge variant="secondary" className="uppercase tracking-wide text-[11px] whitespace-nowrap">
                   {resolvedSuggestions}/{totalSuggestions || 0} reviewed
                 </Badge>
+                {showCleanView && (
+                  <Badge variant="outline" className="uppercase tracking-wide text-[11px]">
+                    Clean view · read-only
+                  </Badge>
+                )}
+                {isRunningAssistAll && (
+                  <Badge variant="outline" className="text-[11px] uppercase tracking-wide">
+                    Batch running...
+                  </Badge>
+                )}
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2 justify-between">
-              {assistEnabled ? (
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                  onClick={onRefreshSuggestions}
-                  disabled={assistLoading}
-                  className="min-w-[120px]"
-                >
-                  {assistLoading ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                  )}
-                  {assistLoading ? "Fetching..." : "Refresh"}
-                </Button>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-10 px-4" title="Review suggestions">
-                      <span className="flex flex-col leading-tight">
-                        <span className="text-xs font-semibold">{pendingCount || 0} pending</span>
-                        <span className="text-[11px] text-muted-foreground tracking-wide">tap to review</span>
-                      </span>
+            <div className="flex flex-wrap items-center gap-3 justify-between">
+              <div className="flex flex-wrap items-center gap-2">
+                {assistEnabled ? (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={onRefreshSuggestions}
+                      disabled={assistLoading || assistWarming || isRunningAssistAll}
+                      className="min-w-[120px]"
+                    >
+                      {assistLoading ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                      )}
+                      {assistLoading ? "Fetching..." : "Refresh"}
                     </Button>
-                  </PopoverTrigger>
-                  <PopoverContent align="end" sideOffset={8} className="w-80 p-4 space-y-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <div>
-                        <p className="text-xs uppercase text-muted-foreground tracking-wide">Assist Review</p>
-                        <p className="text-sm font-semibold">
-                          {pendingCount
-                            ? `${pendingCount} pending`
-                            : totalSuggestions
-                              ? "All caught up"
-                              : assistLoading
-                                ? "Fetching suggestions..."
-                                : "No suggestions yet"}
-                        </p>
-                      </div>
-                      <Badge variant="secondary" className="uppercase tracking-wide text-[11px]">
-                        {resolvedSuggestions}/{totalSuggestions || 0} reviewed
-                      </Badge>
-                    </div>
-                    <Progress value={suggestionProgress} className="h-2" />
-                    {totalSuggestions === 0 && !assistLoading ? (
-                      <div className="rounded-xl border border-dashed border-border/70 bg-background/60 p-4 text-center text-sm text-muted-foreground space-y-2">
-                        <Sparkles className="w-5 h-5 text-primary mx-auto" />
-                        <p>No suggestions yet. Refresh to request assists.</p>
-                      </div>
-                    ) : (
-                        <ScrollArea className="h-[260px] pr-3">
-                          <div className="space-y-3">
-                            {groupedSuggestions.map((group) => (
-                              <div
-                                key={group.key}
-                                className="rounded-2xl border border-border/70 bg-background/70 p-3 space-y-2"
-                              >
-                                <div>
-                                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Context</p>
-                                  <p className="text-sm font-medium leading-snug">{group.context}</p>
-                                </div>
-                                <div className="space-y-2">
-                                  {group.items.map((suggestion) => (
-                                    <div
-                                      key={suggestion.id}
-                                      className={cn(
-                                        "rounded-lg border px-3 py-2 space-y-2",
-                                        suggestion.status === "pending"
-                                          ? "border-primary/40 bg-primary/5"
-                                          : suggestion.status === "accepted"
-                                            ? "border-emerald-300/60 bg-emerald-500/10"
-                                            : "border-border/70 bg-background/60 opacity-75",
-                                      )}
-                                    >
-                                      <div className="flex items-center justify-between gap-2">
-                                        <div>
-                                          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                                            {suggestion.label}
-                                          </p>
-                                          <p className="text-xs text-muted-foreground">
-                                            {suggestion.source ?? "Assist"} ·{" "}
-                                            <span className="capitalize">{suggestion.status}</span>
-                                          </p>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" size="sm" className="h-10 px-4" title="Review suggestions">
+                          <span className="flex flex-col leading-tight">
+                            <span className="text-xs font-semibold">{pendingCount || 0} pending</span>
+                            <span className="text-[11px] text-muted-foreground tracking-wide">tap to review</span>
+                          </span>
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent align="end" sideOffset={8} className="w-80 p-4 space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <div>
+                            <p className="text-xs uppercase text-muted-foreground tracking-wide">Assist Review</p>
+                            <p className="text-sm font-semibold">
+                              {pendingCount
+                                ? `${pendingCount} pending`
+                                : totalSuggestions
+                                  ? "All caught up"
+                                  : assistLoading
+                                    ? "Fetching suggestions..."
+                                    : "No suggestions yet"}
+                            </p>
+                          </div>
+                          <Badge variant="secondary" className="uppercase tracking-wide text-[11px]">
+                            {resolvedSuggestions}/{totalSuggestions || 0} reviewed
+                          </Badge>
+                        </div>
+                        <Progress value={suggestionProgress} className="h-2" />
+                        {totalSuggestions === 0 && !assistLoading ? (
+                          <div className="rounded-xl border border-dashed border-border/70 bg-background/60 p-4 text-center text-sm text-muted-foreground space-y-2">
+                            <Sparkles className="w-5 h-5 text-primary mx-auto" />
+                            <p>No suggestions yet. Refresh to request assists.</p>
+                          </div>
+                        ) : (
+                          <ScrollArea className="h-[260px] pr-3">
+                            <div className="space-y-3">
+                              {groupedSuggestions.map((group) => (
+                                <div
+                                  key={group.key}
+                                  className="rounded-2xl border border-border/70 bg-background/70 p-3 space-y-2"
+                                >
+                                  <div>
+                                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Context</p>
+                                    <p className="text-sm font-medium leading-snug">{group.context}</p>
+                                  </div>
+                                  <div className="space-y-2">
+                                    {group.items.map((suggestion) => (
+                                      <div
+                                        key={suggestion.id}
+                                        className={cn(
+                                          "rounded-lg border px-3 py-2 space-y-2",
+                                          suggestion.status === "pending"
+                                            ? "border-primary/40 bg-primary/5"
+                                            : suggestion.status === "accepted"
+                                              ? "border-emerald-300/60 bg-emerald-500/10"
+                                              : "border-border/70 bg-background/60 opacity-75",
+                                        )}
+                                      >
+                                        <div className="flex items-center justify-between gap-2">
+                                          <div>
+                                            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                                              {suggestion.label}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">
+                                              {suggestion.source ?? "Assist"} ·{" "}
+                                              <span className="capitalize">{suggestion.status}</span>
+                                            </p>
+                                          </div>
+                                          {suggestion.confidence && (
+                                            <span className="text-xs font-semibold text-muted-foreground">
+                                              {Math.round((suggestion.confidence ?? 0) * 100)}%
+                                            </span>
+                                          )}
                                         </div>
-                                        {suggestion.confidence && (
-                                          <span className="text-xs font-semibold text-muted-foreground">
-                                            {Math.round((suggestion.confidence ?? 0) * 100)}%
-                                          </span>
+                                        {suggestion.propertyEvidence && (
+                                          <div className="text-[11px] text-muted-foreground/80 leading-tight space-y-0.5">
+                                            {Object.entries(suggestion.propertyEvidence).map(([key, proof]) => (
+                                              <div key={key}>
+                                                <span className="font-semibold">{key}</span>: {proof}
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+                                        {suggestion.status === "pending" && (
+                                          <div className="flex items-center gap-2">
+                                            <Button
+                                              size="sm"
+                                              className="h-8 flex-1"
+                                              onClick={() => onAcceptSuggestion(suggestion.id)}
+                                            >
+                                              Accept {suggestion.label}
+                                            </Button>
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              className="h-8 flex-1"
+                                              onClick={() => onRejectSuggestion(suggestion.id)}
+                                            >
+                                              Dismiss
+                                            </Button>
+                                          </div>
                                         )}
                                       </div>
-                                      {suggestion.propertyEvidence && (
-                                        <div className="text-[11px] text-muted-foreground/80 leading-tight space-y-0.5">
-                                          {Object.entries(suggestion.propertyEvidence).map(([key, proof]) => (
-                                            <div key={key}>
-                                              <span className="font-semibold">{key}</span>: {proof}
-                                            </div>
-                                          ))}
-                                        </div>
-                                      )}
-                                      {suggestion.status === "pending" && (
-                                        <div className="flex items-center gap-2">
-                                          <Button
-                                            size="sm"
-                                            className="h-8 flex-1"
-                                            onClick={() => onAcceptSuggestion(suggestion.id)}
-                                          >
-                                            Accept {suggestion.label}
-                                          </Button>
-                                          <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className="h-8 flex-1"
-                                            onClick={() => onRejectSuggestion(suggestion.id)}
-                                          >
-                                            Dismiss
-                                          </Button>
-                                        </div>
-                                      )}
-                                    </div>
-                                  ))}
+                                    ))}
+                                  </div>
                                 </div>
-                              </div>
-                            ))}
-                          </div>
-                        </ScrollArea>
-                      )}
-                  </PopoverContent>
-                </Popover>
+                              ))}
+                            </div>
+                          </ScrollArea>
+                        )}
+                      </PopoverContent>
+                    </Popover>
+                  </>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Switch on AI assist to prefill spans and properties.
+                  </p>
+                )}
               </div>
-            ) : (
-              <p className="text-xs text-muted-foreground">Switch on assist to prefill spans and properties.</p>
-            )}
-          </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onRunAssistAll}
+                disabled={isRunningAssistAll || assistLoading || assistWarming}
+                title="Generate AI Assist suggestions for every loaded report"
+                className={cn(
+                  "min-w-[180px] transition-all",
+                  isRunningAssistAll &&
+                    "bg-primary/15 text-primary border-primary/60 assist-batch-active shadow-[0_0_18px_rgba(255,102,51,0.35)]",
+                )}
+              >
+                {isRunningAssistAll ? (
+                  <span className="flex items-center gap-3 text-sm font-semibold">
+                    <span className="assist-sparkles" aria-hidden="true">
+                      <Sparkles className="h-4 w-4" />
+                      <Sparkles className="h-3.5 w-3.5" />
+                      <Sparkles className="h-3 w-3" />
+                    </span>
+                    AI magic happening...
+                  </span>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Run AI Assist on all
+                  </>
+                )}
+              </Button>
+            </div>
         </div>
 
-        {isEditingSource && (
+        {!showCleanView && isEditingSource && (
           <div className="space-y-2">
             <Textarea
               value={text}
@@ -943,22 +1016,61 @@ export const TextEditor = ({
             </div>
           )}
 
-          <div
-            ref={textRef}
-            className="min-h-[400px] p-6 bg-card border border-border rounded-lg leading-relaxed text-base cursor-text"
-            style={{ userSelect: "text", WebkitUserSelect: "text", MozUserSelect: "text" }}
-          >
-            {renderAnnotatedText()}
+          <div className="flex items-center justify-between rounded-lg border border-dashed border-border/70 px-4 py-2">
+            <div>
+              <p className="text-xs uppercase text-muted-foreground">Document view</p>
+              <p className="text-sm font-semibold">
+                {showCleanView ? "Clean (AI-ready)" : "Raw (original formatting)"}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={showCleanView}
+                onCheckedChange={(checked) => setShowCleanView(checked)}
+                disabled={!canShowCleanView}
+                aria-label="Toggle clean text view"
+              />
+              <span className="text-xs text-muted-foreground">
+                {canShowCleanView ? "Switch raw/clean" : "Clean view unavailable"}
+              </span>
+            </div>
           </div>
+
+          {showCleanView ? (
+            <div className="rounded-lg border border-dashed border-border/70 bg-muted/20">
+              <div className="flex items-center justify-between border-b border-border px-4 py-2 text-sm">
+                <div>
+                  <p className="font-semibold">Cleaned text preview</p>
+                  <p className="text-xs text-muted-foreground">Whitespace-normalized, read-only view</p>
+                </div>
+                <Badge variant="outline">AI-ready copy</Badge>
+              </div>
+              <ScrollArea className="max-h-[600px] p-4">
+                <pre className="whitespace-pre-wrap font-mono text-sm text-muted-foreground">
+                  {cleanText ?? text}
+                </pre>
+              </ScrollArea>
+            </div>
+          ) : (
+            <div
+              ref={textRef}
+              className="min-h-[400px] p-6 bg-card border border-border rounded-lg leading-relaxed text-base cursor-text"
+              style={{ userSelect: "text", WebkitUserSelect: "text", MozUserSelect: "text" }}
+            >
+              {renderAnnotatedText()}
+            </div>
+          )}
         </div>
       </div>
 
-      <FloatingLabelMenu
-        labels={schema.labels}
-        position={menuPosition}
-        onApplyLabels={handleApplyLabelSelection}
-        onClose={handleCloseMenu}
-      />
+      {!showCleanView && (
+        <FloatingLabelMenu
+          labels={schema.labels}
+          position={menuPosition}
+          onApplyLabels={handleApplyLabelSelection}
+          onClose={handleCloseMenu}
+        />
+      )}
     </>
   );
 };

@@ -11,14 +11,16 @@ import { GraphPanel } from "@/components/GraphPanel";
 import { AssistSettingsDrawer } from "@/components/AssistSettingsDrawer";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { Annotation, Schema, Relationship, AnnotationMetadata } from "@/types/annotation";
+import type { Annotation, Schema, Relationship, AnnotationMetadata, AnnotationSuggestion } from "@/types/annotation";
 import type { DocumentRecord, DocumentType } from "@/types/document";
 import type { AssistConfig } from "@/types/assist";
 import { defaultAssistConfig } from "@/types/assist";
 import { toast } from "sonner";
 import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
 import pdfWorkerSrc from "pdfjs-dist/build/pdf.worker?url";
-import { generateAssistSuggestions, testAssistConnection } from "@/lib/assistProviders";
+import { generateAssistSuggestions, testAssistConnection, warmAssistEngine } from "@/lib/assistProviders";
+import { generatePreAnnotationSuggestions } from "@/lib/preAnnotation";
+import { attachCleanVariants } from "@/lib/textCleaner";
 
 const SAMPLE_TEXT =
   "CHEST X-RAY (PA AND LATERAL)\n\nClinical History: 66-year-old with dyspnea.\n\nFindings:\n1. Patchy airspace opacities in the right mid and lower lung compatible with pneumonia.\n2. Mild cardiomegaly with prominent pulmonary vasculature.\n3. No pleural effusion or pneumothorax.\n\nImpression:\nRight lower-lobe consolidation consistent with infectious process. Recommend clinical correlation and short-term follow-up imaging.";
@@ -28,18 +30,19 @@ const generateId = () =>
     ? crypto.randomUUID()
     : `id-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
 
-const createSampleDocument = (): DocumentRecord => ({
-  id: generateId(),
-  name: "Sample Document",
-  type: "txt",
-  size: SAMPLE_TEXT.length,
-  text: SAMPLE_TEXT,
-  annotations: [],
-  suggestions: [],
-  relationships: [],
-  status: "ready",
-  origin: "sample",
-});
+const createSampleDocument = (): DocumentRecord =>
+  attachCleanVariants({
+    id: generateId(),
+    name: "Sample Document",
+    type: "txt",
+    size: SAMPLE_TEXT.length,
+    text: SAMPLE_TEXT,
+    annotations: [],
+    suggestions: [],
+    relationships: [],
+    status: "ready",
+    origin: "sample",
+  });
 
 if (typeof window !== "undefined") {
   GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
@@ -71,6 +74,206 @@ const spansOverlap = (aStart: number, aEnd: number, bStart: number, bEnd: number
   aStart < bEnd && aEnd > bStart;
 
 const ASSIST_CONFIG_KEY = "annotatex.assistConfig";
+
+const mapRawRangeToClean = (start: number, end: number, reverseMap: number[]) => {
+  if (start < 0 || end <= start || end > reverseMap.length) {
+    return null;
+  }
+  const cleanStart = reverseMap[start];
+  const cleanEndIndex = reverseMap[end - 1];
+  if (cleanStart === undefined || cleanStart < 0 || cleanEndIndex === undefined || cleanEndIndex < 0) {
+    return null;
+  }
+  return { start: cleanStart, end: cleanEndIndex + 1 };
+};
+
+const mapCleanRangeToRaw = (start: number, end: number, forwardMap: number[]) => {
+  if (start < 0 || end <= start || end > forwardMap.length) {
+    return null;
+  }
+  const rawStart = forwardMap[start];
+  const rawEndIndex = forwardMap[end - 1];
+  if (rawStart === undefined || rawStart < 0 || rawEndIndex === undefined || rawEndIndex < 0) {
+    return null;
+  }
+  return { start: rawStart, end: rawEndIndex + 1 };
+};
+
+const buildAnnotationsForAssist = (doc: DocumentRecord): Annotation[] => {
+  if (!doc.cleanText || !doc.cleanReverseMap?.length) {
+    return doc.annotations;
+  }
+  const next: Annotation[] = [];
+  doc.annotations.forEach((annotation) => {
+    const mapped = mapRawRangeToClean(annotation.start, annotation.end, doc.cleanReverseMap!);
+    if (!mapped) {
+      return;
+    }
+    next.push({
+      ...annotation,
+      start: mapped.start,
+      end: mapped.end,
+      text: doc.cleanText!.slice(mapped.start, mapped.end),
+    });
+  });
+  return next;
+};
+type CleanRange = { start: number; end: number };
+
+const findAvailableSpan = (
+  sourceLower: string,
+  needleLower: string,
+  occupied: CleanRange[],
+): CleanRange | null => {
+  if (!needleLower.length) return null;
+  let fromIndex = 0;
+  while (fromIndex <= sourceLower.length - needleLower.length) {
+    const idx = sourceLower.indexOf(needleLower, fromIndex);
+    if (idx === -1) break;
+    const end = idx + needleLower.length;
+    const overlaps = occupied.some((range) => range.start < end && range.end > idx);
+    if (!overlaps) {
+      return { start: idx, end };
+    }
+    fromIndex = idx + 1;
+  }
+  return null;
+};
+
+const adjustConfidence = (value: number | undefined, factor: number) => {
+  const base = typeof value === "number" && !Number.isNaN(value) ? value : 0.9;
+  return Math.min(Math.max(base * factor, 0), 1);
+};
+
+const assignSuggestionsToRawText = (
+  doc: DocumentRecord,
+  suggestions: AnnotationSuggestion[],
+  schema: Schema,
+): AnnotationSuggestion[] => {
+  const canUseClean = Boolean(
+    doc.cleanText && doc.cleanMap?.length && doc.cleanReverseMap?.length && doc.text.length,
+  );
+  const sourceText = canUseClean ? doc.cleanText! : doc.text;
+  const sourceLower = sourceText.toLowerCase();
+  const occupied = new Map<string, CleanRange[]>();
+  const getRanges = (labelId: string) => {
+    if (!occupied.has(labelId)) {
+      occupied.set(labelId, []);
+    }
+    return occupied.get(labelId)!;
+  };
+  const heuristicsByLabel = new Map<string, AnnotationSuggestion[]>();
+  const heuristicsPool = generatePreAnnotationSuggestions(doc.text, schema, doc.annotations);
+  heuristicsPool.forEach((entry) => {
+    if (!heuristicsByLabel.has(entry.labelId)) {
+      heuristicsByLabel.set(entry.labelId, []);
+    }
+    heuristicsByLabel.get(entry.labelId)!.push(entry);
+  });
+  const results: AnnotationSuggestion[] = [];
+
+  const convertToRawSpan = (span: CleanRange): CleanRange | null => {
+    if (!canUseClean || !doc.cleanMap) {
+      return span;
+    }
+    return mapCleanRangeToRaw(span.start, span.end, doc.cleanMap) ?? null;
+  };
+
+  suggestions.forEach((suggestion) => {
+    if (canUseClean && suggestion.end > suggestion.start) {
+      if (suggestion.end > sourceText.length) {
+        return;
+      }
+      const cleanSpan = { start: suggestion.start, end: suggestion.end };
+      getRanges(suggestion.labelId).push(cleanSpan);
+      const rawSpan = convertToRawSpan(cleanSpan);
+      if (!rawSpan) {
+        return;
+      }
+      results.push({
+        ...suggestion,
+        start: rawSpan.start,
+        end: rawSpan.end,
+        text: doc.text.slice(rawSpan.start, rawSpan.end),
+      });
+      return;
+    }
+
+    if (!canUseClean && suggestion.end > suggestion.start) {
+      const clampedEnd = Math.min(suggestion.end, doc.text.length);
+      if (clampedEnd <= suggestion.start) {
+        return;
+      }
+      results.push({
+        ...suggestion,
+        start: suggestion.start,
+        end: clampedEnd,
+        text: doc.text.slice(suggestion.start, clampedEnd),
+      });
+      return;
+    }
+
+    const candidate = (suggestion.text ?? "").trim();
+    if (!candidate.length) {
+      return;
+    }
+    const candidateLower = candidate.toLowerCase();
+    let span = findAvailableSpan(sourceLower, candidateLower, getRanges(suggestion.labelId));
+    let matchQuality: "exact" | "context" | null = span ? "exact" : null;
+
+    if (!span && suggestion.context) {
+      const contextNeedle = suggestion.context.trim().toLowerCase();
+      const contextSpan = findAvailableSpan(sourceLower, contextNeedle, getRanges(suggestion.labelId));
+      if (contextSpan) {
+        const contextSlice = sourceLower.slice(contextSpan.start, contextSpan.end);
+        const innerIdx = contextSlice.indexOf(candidateLower);
+        span =
+          innerIdx >= 0
+            ? {
+                start: contextSpan.start + innerIdx,
+                end: contextSpan.start + innerIdx + candidateLower.length,
+              }
+            : contextSpan;
+        matchQuality = innerIdx >= 0 ? "exact" : "context";
+      }
+    }
+
+    if (span) {
+      getRanges(suggestion.labelId).push(span);
+      const rawSpan = convertToRawSpan(span);
+      if (!rawSpan) {
+        console.warn(`[AI Assist] Failed to map clean span for "${candidate}" in "${doc.name}"`);
+        return;
+      }
+      const factor = matchQuality === "context" ? 0.85 : 1;
+      results.push({
+        ...suggestion,
+        start: rawSpan.start,
+        end: rawSpan.end,
+        text: doc.text.slice(rawSpan.start, rawSpan.end),
+        confidence: adjustConfidence(suggestion.confidence, factor),
+      });
+      return;
+    }
+
+    const fallbackPool = heuristicsByLabel.get(suggestion.labelId);
+    const fallback = fallbackPool?.shift();
+    if (fallback) {
+      results.push({
+        ...suggestion,
+        start: fallback.start,
+        end: fallback.end,
+        text: doc.text.slice(fallback.start, fallback.end),
+        confidence: adjustConfidence(suggestion.confidence, 0.6),
+        context: fallback.context ?? suggestion.context,
+      });
+    } else {
+      console.warn(`[AI Assist] Unable to locate span for "${candidate}" in "${doc.name}"`);
+    }
+  });
+
+  return results;
+};
 
 const Index = () => {
   const [documents, setDocuments] = useState<DocumentRecord[]>([createSampleDocument()]);
@@ -163,6 +366,8 @@ const Index = () => {
   const [isAssistSettingsOpen, setIsAssistSettingsOpen] = useState(false);
   const [isTestingAssist, setIsTestingAssist] = useState(false);
   const [assistTestMessage, setAssistTestMessage] = useState<string | null>(null);
+  const [isRunningAssistAll, setIsRunningAssistAll] = useState(false);
+  const [isWarmingAssist, setIsWarmingAssist] = useState(false);
 
   const activeDocument = useMemo(
     () => documents.find((doc) => doc.id === activeDocumentId) ?? documents[0] ?? null,
@@ -218,7 +423,7 @@ const Index = () => {
   );
 
   const handleSetText = (nextText: string) => {
-    mutateActiveDocument((doc) => ({ ...doc, text: nextText }));
+    mutateActiveDocument((doc) => attachCleanVariants({ ...doc, text: nextText }));
   };
 
   const handleAddAnnotation = (annotation: Annotation) => {
@@ -417,34 +622,38 @@ const Index = () => {
           if (!text.trim()) {
             throw new Error("No extractable text");
           }
-          nextDocuments.push({
-            id: generateId(),
-            name,
-            type: docType,
-            size: file.size,
-            lastModified: file.lastModified,
-            text,
-            annotations: [],
-            suggestions: [],
-            relationships: [],
-            status: "ready",
-            origin: "uploaded",
-          });
+          nextDocuments.push(
+            attachCleanVariants({
+              id: generateId(),
+              name,
+              type: docType,
+              size: file.size,
+              lastModified: file.lastModified,
+              text,
+              annotations: [],
+              suggestions: [],
+              relationships: [],
+              status: "ready",
+              origin: "uploaded",
+            }),
+          );
         } catch (error) {
-          nextDocuments.push({
-            id: generateId(),
-            name,
-            type: docType,
-            size: file.size,
-            lastModified: file.lastModified,
-            text: "",
-            annotations: [],
-            suggestions: [],
-            relationships: [],
-            status: "error",
-            error: error instanceof Error ? error.message : "Failed to process file",
-            origin: "uploaded",
-          });
+          nextDocuments.push(
+            attachCleanVariants({
+              id: generateId(),
+              name,
+              type: docType,
+              size: file.size,
+              lastModified: file.lastModified,
+              text: "",
+              annotations: [],
+              suggestions: [],
+              relationships: [],
+              status: "error",
+              error: error instanceof Error ? error.message : "Failed to process file",
+              origin: "uploaded",
+            }),
+          );
         }
       }
 
@@ -467,9 +676,12 @@ const Index = () => {
     }
   };
 
+  const assistInFlightRef = useRef<Set<string>>(new Set());
+  const autoAssistPrimedRef = useRef<Set<string>>(new Set());
+
   const runAssistSuggestions = useCallback(
-    async (docId: string, options: { force?: boolean } = {}) => {
-      const { force = false } = options;
+    async (docId: string, options: { force?: boolean; silent?: boolean } = {}) => {
+      const { force = false, silent = false } = options;
       const targetDocument = documents.find((doc) => doc.id === docId);
       if (!targetDocument) return;
       if (!targetDocument.text.trim()) {
@@ -480,29 +692,44 @@ const Index = () => {
         return;
       }
 
-      setAssistLoading(true);
+      if (assistInFlightRef.current.has(docId)) {
+        return;
+      }
+      assistInFlightRef.current.add(docId);
+      autoAssistPrimedRef.current.add(docId);
+
+      if (!silent) {
+        setAssistLoading(true);
+      }
       try {
+        console.debug(`[AI Assist] Requesting suggestions for "${targetDocument.name}" (${docId})`);
+        const textForAssist = targetDocument.cleanText ?? targetDocument.text;
+        const annotationsForAssist = buildAnnotationsForAssist(targetDocument);
         const { suggestions: generated, sourceLabel } = await generateAssistSuggestions(
-          targetDocument.text,
+          textForAssist,
           schema,
-          targetDocument.annotations,
+          annotationsForAssist,
           assistConfig,
         );
+
+        const normalizedSuggestions = assignSuggestionsToRawText(targetDocument, generated, schema);
 
         setDocuments((prev) =>
           prev.map((doc) =>
             doc.id === docId
               ? {
                   ...doc,
-                  suggestions: generated,
+                  suggestions: normalizedSuggestions,
                 }
               : doc,
           ),
         );
 
-        if (generated.length) {
+        if (normalizedSuggestions.length) {
           toast.success(
-            `Assist (${sourceLabel}) suggested ${generated.length} span${generated.length === 1 ? "" : "s"}`,
+            `Assist (${sourceLabel}) suggested ${normalizedSuggestions.length} span${
+              normalizedSuggestions.length === 1 ? "" : "s"
+            }`,
           );
         } else {
           toast.info("Assist couldn't find suggestions for this document.");
@@ -512,21 +739,96 @@ const Index = () => {
           description: error instanceof Error ? error.message : "Unknown error",
         });
       } finally {
-        setAssistLoading(false);
+        assistInFlightRef.current.delete(docId);
+        if (!silent) {
+          setAssistLoading(false);
+        }
       }
     },
     [assistConfig, documents, schema],
   );
 
   const handleToggleAssist = (enabled: boolean) => {
-    setAssistEnabled(enabled);
-    if (enabled && activeDocumentId) {
-      void runAssistSuggestions(activeDocumentId);
+    if (!enabled) {
+      setAssistEnabled(false);
+      return;
     }
+    if (isRunningAssistAll || isWarmingAssist) {
+      toast.info("AI Assist is already running", {
+        description: "Wait for the current job to finish before toggling again.",
+      });
+      return;
+    }
+
+    setAssistEnabled(true);
+    void (async () => {
+      const requiresWarmup = assistConfig.mode === "ollama";
+      try {
+        if (requiresWarmup) {
+          setIsWarmingAssist(true);
+          await warmAssistEngine(assistConfig);
+        }
+        if (activeDocumentId) {
+          await runAssistSuggestions(activeDocumentId);
+        }
+      } catch (error) {
+        setAssistEnabled(false);
+        toast.error("Failed to prepare AI Assist", {
+          description: error instanceof Error ? error.message : "Unknown error",
+        });
+      } finally {
+        if (requiresWarmup) {
+          setIsWarmingAssist(false);
+        }
+      }
+    })();
   };
+
+  const handleRunAssistAll = useCallback(async () => {
+    const readyDocs = documents.filter(
+      (doc) => doc.status === "ready" && (doc.text?.trim()?.length ?? 0) > 0,
+    );
+    if (!readyDocs.length) {
+      toast.info("No ready documents available for AI Assist.");
+      return;
+    }
+    const shouldEnableAssist = !assistEnabled;
+    if (shouldEnableAssist) {
+      setAssistEnabled(true);
+    }
+    setIsRunningAssistAll(true);
+    try {
+      if (assistConfig.mode === "ollama") {
+        setIsWarmingAssist(true);
+        try {
+          await warmAssistEngine(assistConfig);
+        } finally {
+          setIsWarmingAssist(false);
+        }
+      }
+      let processed = 0;
+      for (const doc of readyDocs) {
+        await runAssistSuggestions(doc.id, { force: true, silent: true });
+        processed += 1;
+      }
+      toast.success(`AI Assist processed ${processed} document${processed === 1 ? "" : "s"}`);
+    } catch (error) {
+      toast.error("AI Assist batch run failed", {
+        description: error instanceof Error ? error.message : "Unknown error",
+      });
+    } finally {
+      setIsRunningAssistAll(false);
+    }
+  }, [assistEnabled, documents, runAssistSuggestions]);
 
   const handleRefreshSuggestions = () => {
     if (!activeDocumentId) return;
+    if (isRunningAssistAll) {
+      toast.info("Batch assist already running", {
+        description: "Pause individual refreshes until the global run completes.",
+      });
+      return;
+    }
     void runAssistSuggestions(activeDocumentId, { force: true });
   };
 
@@ -553,14 +855,23 @@ const Index = () => {
   useEffect(() => {
     if (!assistEnabled || !activeDocumentId) return;
     const currentDoc = documents.find((doc) => doc.id === activeDocumentId);
-    if (currentDoc && currentDoc.suggestions.length === 0 && currentDoc.text.trim()) {
-      void runAssistSuggestions(activeDocumentId);
+    if (
+      !currentDoc ||
+      currentDoc.status !== "ready" ||
+      !currentDoc.text.trim() ||
+      autoAssistPrimedRef.current.has(currentDoc.id)
+    ) {
+      return;
+    }
+    if (currentDoc.suggestions.length === 0) {
+      void runAssistSuggestions(currentDoc.id);
     }
   }, [assistEnabled, activeDocumentId, documents, runAssistSuggestions]);
 
   const annotations = activeDocument?.annotations ?? [];
   const relationships = activeDocument?.relationships ?? [];
   const text = activeDocument?.text ?? SAMPLE_TEXT;
+  const cleanText = activeDocument?.cleanText;
   const suggestions = activeDocument?.suggestions ?? [];
   const assistEngineLabel =
     assistConfig.mode === "ollama" ? `Ollama · ${assistConfig.ollamaModel}` : "Heuristic";
@@ -593,6 +904,7 @@ const Index = () => {
         <ResizablePanel defaultSize={50} minSize={35} className="overflow-auto">
           <TextEditor
             text={text}
+            cleanText={cleanText}
             setText={handleSetText}
             annotations={annotations}
             onAddAnnotation={handleAddAnnotation}
@@ -606,12 +918,15 @@ const Index = () => {
             suggestions={suggestions}
             assistEnabled={assistEnabled}
             assistLoading={assistLoading}
+            assistWarming={isWarmingAssist}
             onToggleAssist={handleToggleAssist}
             assistEngineLabel={assistEngineLabel}
             onOpenAssistSettings={() => setIsAssistSettingsOpen(true)}
             onAcceptSuggestion={handleAcceptSuggestion}
             onRejectSuggestion={handleRejectSuggestion}
             onRefreshSuggestions={handleRefreshSuggestions}
+            onRunAssistAll={handleRunAssistAll}
+            isRunningAssistAll={isRunningAssistAll}
           />
         </ResizablePanel>
 

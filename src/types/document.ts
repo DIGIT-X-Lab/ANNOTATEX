@@ -9,6 +9,9 @@ export interface DocumentRecord {
   size: number;
   lastModified?: number;
   text: string;
+  cleanText?: string;
+  cleanMap?: number[];
+  cleanReverseMap?: number[];
   annotations: Annotation[];
   suggestions: AnnotationSuggestion[];
   relationships: Relationship[];

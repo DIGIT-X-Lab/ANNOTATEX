@@ -129,6 +129,69 @@ All colors MUST be HSL.
 }
 
 @layer utilities {
+  @keyframes assistPulse {
+    0% {
+      box-shadow: 0 0 0 0 rgba(255, 102, 51, 0.45);
+    }
+    70% {
+      box-shadow: 0 0 0 8px rgba(255, 102, 51, 0);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgba(255, 102, 51, 0);
+    }
+  }
+
+  .assist-batch-active {
+    animation: assistPulse 1.6s ease-in-out infinite;
+  }
+
+  @keyframes sparkleFloat {
+    0% {
+      transform: translateY(0) scale(0.85) rotate(0deg);
+      opacity: 0.5;
+    }
+    50% {
+      transform: translateY(-3px) scale(1.05) rotate(6deg);
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(0) scale(0.85) rotate(0deg);
+      opacity: 0.5;
+    }
+  }
+
+  .assist-sparkles {
+    position: relative;
+    width: 36px;
+    height: 18px;
+  }
+
+  .assist-sparkles svg {
+    position: absolute;
+    color: hsl(var(--primary));
+    animation: sparkleFloat 1.5s ease-in-out infinite;
+    filter: drop-shadow(0 0 8px hsl(var(--primary) / 0.5));
+  }
+
+  .assist-sparkles svg:nth-child(1) {
+    left: 0;
+    top: 2px;
+  }
+
+  .assist-sparkles svg:nth-child(2) {
+    right: 0;
+    top: -2px;
+    animation-delay: 0.25s;
+    transform: scale(0.9);
+  }
+
+  .assist-sparkles svg:nth-child(3) {
+    left: 12px;
+    bottom: 0;
+    animation-delay: 0.5s;
+    transform: scale(0.75);
+  }
+
   .annotation-highlight {
     border-radius: 0.25rem;
     padding: 0.125rem 0.25rem;

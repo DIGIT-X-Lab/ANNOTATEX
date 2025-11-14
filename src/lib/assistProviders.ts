@@ -20,7 +20,7 @@ interface PropertyFillItem {
   id: string;
   labelId: string;
   labelName: string;
-  context: string;
+  evidence: string;
 }
 
 interface PropertyFillResponse {
@@ -35,45 +35,12 @@ const sanitizeHost = (host: string) => {
   return host.endsWith("/") ? host.slice(0, -1) : host;
 };
 
-const hasOverlap = (start: number, end: number, spans: Array<{ start: number; end: number }>) =>
-  spans.some((span) => span.start < end && span.end > start);
-
-const getOccupiedBucket = (
-  store: Map<string, Array<{ start: number; end: number }>>,
-  labelId: string,
-) => {
-  if (!store.has(labelId)) {
-    store.set(labelId, []);
-  }
-  return store.get(labelId)!;
-};
-
 const chunkArray = <T>(items: T[], size: number): T[][] => {
   const chunks: T[][] = [];
   for (let i = 0; i < items.length; i += size) {
     chunks.push(items.slice(i, i + size));
   }
   return chunks;
-};
-
-const locateSpan = (
-  text: string,
-  snippet: string,
-  occupied: Map<string, Array<{ start: number; end: number }>>,
-  labelId: string,
-): { start: number; end: number } | null => {
-  if (!snippet.trim()) return null;
-  let searchIndex = 0;
-  while (searchIndex < text.length) {
-    const found = text.indexOf(snippet, searchIndex);
-    if (found === -1) break;
-    const span = { start: found, end: found + snippet.length };
-    if (!hasOverlap(span.start, span.end, getOccupiedBucket(occupied, labelId))) {
-      return span;
-    }
-    searchIndex = span.end;
-  }
-  return null;
 };
 
 const describeLabel = (label: Label) => {
@@ -88,18 +55,34 @@ const describeLabel = (label: Label) => {
 
 const buildOllamaPrompt = (text: string, schema: Schema, maxSuggestions: number) => {
   const labelDescriptions = schema.labels.map(describeLabel).join("\n");
+  const example = JSON.stringify(
+    [
+      {
+        labelId: "pleural_effusion",
+        text: "Extensive right pleural effusion",
+        context: "Extensive right pleural effusion, potentially combined with...",
+        confidence: 0.94,
+        properties: {
+          presence: { value: "Yes", evidence: "Extensive right pleural effusion" },
+          severity: { value: "Severe", evidence: "Extensive" },
+        },
+      },
+    ],
+    null,
+    2,
+  );
+
   return [
     "You assist radiology annotators by returning every text span that matches their schema.",
-    "Respond ONLY with a JSON array. Each element must follow exactly:",
-    '{"labelId":"cardiomegaly","text":"exact substring copied verbatim","start":120,"end":145,"confidence":0.92,"context":"full sentence or clause that justifies the label","properties":{"severity":{"value":"Moderate","evidence":"sentence fragment proving the severity"},"presence":{"value":"Yes","evidence":"phrase showing presence"}}}',
+    "Respond ONLY with a JSON array shaped like:",
+    example,
     "Rules:",
     "- Use schema labelId values exactly as provided.",
-    "- start/end are zero-based character offsets referencing the document string.",
-    "- text must match the document substring for that range (do not paraphrase).",
-    "- context should be the full sentence/phrase that proves the label and can span multiple lines if needed.",
-    "- properties must include only the schema-defined fields. For each property, return an object with `value` and an `evidence` snippet pulled directly from the document.",
-    "- Include every occurrence for each label when evidence exists; omit labels with no supporting span.",
+    "- `text` must be copied verbatim from the document (no paraphrasing); keep punctuation and casing.",
+    "- `context` should be the full sentence/phrase that justifies the label (can span multiple lines).",
+    "- Include every occurrence for each label when evidence exists; omit labels with no support.",
     `- Return at most ${maxSuggestions} spans (prioritize clinically important mentions).`,
+    '- For each schema property, output { "value": ..., "evidence": "phrase proving it" } using direct quotes from the note.',
     "Schema:",
     labelDescriptions,
     "Document:",
@@ -173,6 +156,14 @@ const normalizeSelect = (value: unknown, property: LabelProperty): string | unde
     return match ?? undefined;
   }
   return raw;
+};
+
+const isValueFilled = (value: unknown): boolean => {
+  if (value === null || value === undefined) return false;
+  if (typeof value === "string") return value.trim().length > 0;
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === "object") return Object.keys(value as Record<string, unknown>).length > 0;
+  return true;
 };
 
 const needsPropertyCompletion = (suggestion: AnnotationSuggestion, label?: Label) => {
@@ -448,7 +439,7 @@ const enrichSuggestionsWithProperties = async (
       id: suggestion.id,
       labelId: suggestion.labelId,
       labelName: suggestion.label,
-      context: (suggestion.context ?? suggestion.text ?? "").slice(0, 1500),
+      evidence: (suggestion.context ?? suggestion.text ?? "").slice(0, 1500),
     }));
 
     try {
@@ -558,7 +549,7 @@ const buildPropertyFillPrompt = (
         `   label: ${label?.name ?? item.labelName} (${item.labelId})`,
         "   properties:",
         propertyLines,
-        "   context:",
+        "   evidence:",
         '   """',
         `   ${context}`,
         '   """',
@@ -580,14 +571,13 @@ const extractJsonBlock = (raw: string) => {
 };
 
 const mapOllamaOutput = (
-  text: string,
+  _text: string,
   schema: Schema,
   rawSuggestions: Array<Record<string, unknown>>,
   maxSuggestions: number,
   source: string,
 ): AnnotationSuggestion[] => {
   const suggestions: AnnotationSuggestion[] = [];
-  const occupied = new Map<string, Array<{ start: number; end: number }>>();
 
   normalizeCandidates(rawSuggestions)
     .slice(0, maxSuggestions)
@@ -599,53 +589,15 @@ const mapOllamaOutput = (
         (labelName ? schema.labels.find((l) => l.name.toLowerCase() === labelName.toLowerCase()) : undefined);
       if (!label) return;
 
-      const rawStart = typeof candidate.start === "number" ? candidate.start : undefined;
-      const rawEnd = typeof candidate.end === "number" ? candidate.end : undefined;
-      let span: { start: number; end: number } | null = null;
-
-      if (
-        typeof rawStart === "number" &&
-        typeof rawEnd === "number" &&
-        rawStart >= 0 &&
-        rawEnd <= text.length &&
-        rawEnd > rawStart
-      ) {
-        const candidateSpan = { start: rawStart, end: rawEnd };
-        if (!hasOverlap(candidateSpan.start, candidateSpan.end, getOccupiedBucket(occupied, label.id))) {
-          span = candidateSpan;
-        }
-      }
-
-      const candidateText = typeof candidate.text === "string" ? candidate.text : "";
-      let contextText =
-        typeof candidate.context === "string" && candidate.context.trim().length
-          ? candidate.context.trim()
-          : undefined;
-
-      if (contextText) {
-        const contextIndex = text.indexOf(contextText);
-        if (contextIndex !== -1) {
-          const contextSpan = { start: contextIndex, end: contextIndex + contextText.length };
-          if (!hasOverlap(contextSpan.start, contextSpan.end, getOccupiedBucket(occupied, label.id))) {
-            span = contextSpan;
-          }
-        }
-      }
-
-      if (!span) {
-        span = locateSpan(text, candidateText, occupied, label.id);
-      }
-
-      if (!span) {
+      const candidateText = typeof candidate.text === "string" ? candidate.text.trim() : "";
+      if (!candidateText.length) {
         return;
       }
 
-      getOccupiedBucket(occupied, label.id).push(span);
-
-      const snippetText = text.slice(span.start, span.end);
-      if (!contextText || contextText === candidateText) {
-        contextText = snippetText;
-      }
+      const contextText =
+        typeof candidate.context === "string" && candidate.context.trim().length
+          ? candidate.context.trim()
+          : undefined;
       const confidence = clampConfidence(candidate.confidence as number | undefined);
       const { metadata, evidence } = parsePropertiesFromModel(
         label,
@@ -653,10 +605,10 @@ const mapOllamaOutput = (
       );
 
       suggestions.push({
-        id: `assist-ollama-${label.id}-${span.start}-${span.end}-${index}`,
-        start: span.start,
-        end: span.end,
-        text: snippetText,
+        id: `assist-ollama-${label.id}-${index}`,
+        start: 0,
+        end: 0,
+        text: candidateText,
         labelId: label.id,
         label: label.name,
         color: label.color,
@@ -664,7 +616,7 @@ const mapOllamaOutput = (
         status: "pending",
         confidence,
         source,
-        context: contextText,
+        context: contextText ?? candidateText,
         propertyEvidence: evidence,
       });
     });
@@ -695,6 +647,89 @@ const ensureLabelCoverage = (
     suggestions: [...primary, ...additions],
     supplemented: additions.length > 0,
   };
+};
+
+const ollamaModelReadyPromises = new Map<string, Promise<void>>();
+
+const ensureOllamaModelReady = (config: AssistConfig) => {
+  if (config.mode !== "ollama") {
+    return Promise.resolve();
+  }
+  const normalizedHost = sanitizeHost(config.ollamaHost);
+  const key = `${normalizedHost}::${config.ollamaModel}`;
+  if (ollamaModelReadyPromises.has(key)) {
+    return ollamaModelReadyPromises.get(key)!;
+  }
+
+  const readinessPromise = (async () => {
+    const modelExists = async () => {
+      try {
+        const tagsResponse = await fetch(`${normalizedHost}/api/tags`);
+        if (!tagsResponse.ok) {
+          return false;
+        }
+        const payload = await tagsResponse.json();
+        const models = Array.isArray(payload?.models) ? payload.models : payload;
+        if (!Array.isArray(models)) {
+          return false;
+        }
+        return models.some((model: Record<string, unknown>) => {
+          const name = (model.name ?? model.model ?? "") as string;
+          return name === config.ollamaModel;
+        });
+      } catch (error) {
+        console.warn("Failed to query Ollama tags", error);
+        return false;
+      }
+    };
+
+    if (await modelExists()) {
+      return;
+    }
+
+    const pullResponse = await fetch(`${normalizedHost}/api/pull`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ model: config.ollamaModel }),
+    });
+
+    if (!pullResponse.ok) {
+      throw new Error(`Failed to pull Ollama model (${pullResponse.status})`);
+    }
+
+    // Consume the body (stream of progress events) to completion.
+    try {
+      if (pullResponse.body) {
+        const reader = pullResponse.body.getReader();
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          const { done } = await reader.read();
+          if (done) break;
+        }
+      } else {
+        await pullResponse.text();
+      }
+    } catch (error) {
+      console.warn("Failed to read Ollama pull stream", error);
+    }
+  })().catch((error) => {
+    ollamaModelReadyPromises.delete(key);
+    throw error;
+  });
+
+  ollamaModelReadyPromises.set(key, readinessPromise);
+  return readinessPromise;
+};
+
+const logRawOllamaResponse = (payload: unknown) => {
+  try {
+    // eslint-disable-next-line no-console
+    console.debug("[AI Assist] Ollama raw response:", payload);
+  } catch (error) {
+    console.warn("[AI Assist] Failed to log Ollama response", error);
+  }
 };
 
 const requestOllamaSuggestions = async (
@@ -728,6 +763,7 @@ const requestOllamaSuggestions = async (
     }
 
     const payload = await response.json();
+    logRawOllamaResponse(payload);
     const raw = typeof payload?.response === "string" ? payload.response : JSON.stringify(payload);
     const jsonBlock = extractJsonBlock(raw);
     const parsed = JSON.parse(jsonBlock);
@@ -772,6 +808,7 @@ export const generateAssistSuggestions = async (
 
   if (config.mode === "ollama") {
     try {
+      await ensureOllamaModelReady(config);
       const result = await requestOllamaSuggestions(text, schema, annotations, config);
       const heuristicSuggestions = getHeuristics();
       const { suggestions, supplemented } = ensureLabelCoverage(result.suggestions, heuristicSuggestions);
@@ -792,6 +829,10 @@ export const generateAssistSuggestions = async (
     suggestions: getHeuristics(),
     sourceLabel: "Heuristics",
   };
+};
+
+export const warmAssistEngine = async (config: AssistConfig) => {
+  await ensureOllamaModelReady(config);
 };
 
 export const testAssistConnection = async (config: AssistConfig): Promise<string> => {
